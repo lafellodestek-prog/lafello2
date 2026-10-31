@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0a14">
+  <title>Lafello</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23ff2d6f'/><circle cx='16' cy='16' r='5' fill='white'/></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Giris / kayit -->
+<section id="view-auth" class="view">
+  <div class="auth-card">
+    <div class="logo big"><span class="dot"></span>Lafello</div>
+    <p class="muted" data-i18n="tagline"></p>
+    <form id="auth-form" autocomplete="on">
+      <input id="auth-name" name="username" autocomplete="username" data-i18n-ph="name" required>
+      <input id="auth-pass" name="password" type="password" autocomplete="current-password" data-i18n-ph="pass" required>
+      <label class="check hidden" id="auth-adult-row"><input type="checkbox" id="auth-adult"> <span data-i18n="adult"></span></label>
+      <p class="error" id="auth-error"></p>
+      <button class="btn primary" id="auth-submit" type="submit"></button>
+    </form>
+    <button class="link" id="auth-switch" type="button"></button>
+    <p class="tiny muted" data-i18n="rules"></p>
+    <button class="lang-btn" type="button" data-action="lang"></button>
+  </div>
+</section>
+
+<!-- Ana sayfa -->
+<section id="view-home" class="view hidden">
+  <header class="topbar">
+    <div class="logo"><span class="dot"></span>Lafello</div>
+    <div class="topbar-right">
+      <button class="icon-btn dm-btn" data-action="inbox" title="Mesajlar">💬<i class="dm-badge hidden"></i></button>
+      <button class="pill coin" data-action="wallet"><span>🪙</span><b id="home-coins">0</b></button>
+      <button class="lang-btn" type="button" data-action="lang"></button>
+      <button class="avatar-btn" data-action="wallet" id="home-avatar"></button>
+    </div>
+  </header>
+  <nav class="tabs" id="home-tabs">
+    <button data-tab="all" class="active" data-i18n="tab_all"></button>
+    <button data-tab="video" data-i18n="tab_video"></button>
+    <button data-tab="voice" data-i18n="tab_voice"></button>
+    <button data-tab="chat" data-i18n="tab_chat"></button>
+    <button data-tab="pk" data-i18n="tab_pk"></button>
+  </nav>
+  <main class="grid" id="room-grid"></main>
+  <p class="empty muted hidden" id="room-empty" data-i18n="empty"></p>
+  <button class="fab" data-action="golive"><span class="dot"></span><span data-i18n="goLive"></span></button>
+</section>
+
+<!-- Canli oda -->
+<section id="view-room" class="view hidden">
+  <div class="room" id="room">
+    <div class="stage" id="stage">
+      <div class="screens" id="screens">
+        <div class="screen" id="screen-main"><video id="v-main" autoplay playsinline></video><span class="screen-name" id="name-main"></span></div>
+        <div class="screen hidden" id="screen-side"><video id="v-side" autoplay playsinline></video><span class="screen-name" id="name-side"></span></div>
+      </div>
+      <div class="seats hidden" id="seats"></div>
+      <div class="pkbar hidden" id="pkbar">
+        <div class="pk-scores"><span id="pk-left">0</span><span class="pk-vs">PK <b id="pk-timer">3:00</b></span><span id="pk-right">0</span></div>
+        <div class="pk-track"><div class="pk-fill" id="pk-fill"></div></div>
+        <p class="pk-hint" data-i18n="pk_hint"></p>
+      </div>
+      <button class="sound-btn hidden" id="sound-btn" data-i18n="tapSound"></button>
+    </div>
+
+    <div class="room-top">
+      <div class="host-chip">
+        <div class="avatar" id="room-host-avatar"></div>
+        <div><b id="room-title"></b><small id="room-count"></small></div>
+      </div>
+      <div class="top-fans" id="room-top"></div>
+      <button class="icon-btn dm-btn" data-action="inbox" title="Mesajlar">💬<i class="dm-badge hidden"></i></button>
+      <button class="icon-btn" data-action="report" title="report">⚑</button>
+      <button class="icon-btn" data-action="leave" title="close">✕</button>
+    </div>
+
+    <div class="gift-banners" id="gift-banners"></div>
+    <div class="gift-burst" id="gift-burst"></div>
+    <div class="chat" id="chat"></div>
+
+    <div class="room-bottom">
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" maxlength="200" autocomplete="off" data-i18n-ph="say">
+      </form>
+      <div class="room-actions" id="room-actions"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Pencereler -->
+<div class="sheet-backdrop hidden" id="backdrop"></div>
+
+<div class="sheet hidden" id="sheet-golive">
+  <h3 data-i18n="golive_title"></h3>
+  <div class="choice-row">
+    <button class="choice active" data-type="video"><span>🎥</span><b data-i18n="golive_video"></b><small data-i18n="golive_video_d"></small></button>
+    <button class="choice" data-type="voice"><span>🎙️</span><b data-i18n="golive_voice"></b><small data-i18n="golive_voice_d"></small></button>
+    <button class="choice" data-type="chat"><span>💬</span><b data-i18n="golive_chat"></b><small data-i18n="golive_chat_d"></small></button>
+  </div>
+  <input id="golive-title" maxlength="40" data-i18n-ph="golive_name">
+  <p class="tiny muted" data-i18n="rules"></p>
+  <div class="row">
+    <button class="btn ghost" data-action="close-sheet" data-i18n="cancel"></button>
+    <button class="btn primary" id="golive-start" data-i18n="golive_start"></button>
+  </div>
+</div>
+
+<div class="sheet hidden" id="sheet-gifts">
+  <div class="sheet-head"><h3 data-i18n="gifts"></h3><button class="pill coin" data-action="wallet"><span>🪙</span><b id="gift-coins">0</b></button></div>
+  <div class="to-row hidden" id="gift-to"></div>
+  <div class="gift-grid" id="gift-grid"></div>
+  <button class="btn primary" id="gift-send" data-i18n="sendGift"></button>
+</div>
+
+<div class="sheet hidden" id="sheet-wallet">
+  <div class="sheet-head"><h3 data-i18n="wallet"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
+  <div class="wallet-me"><div class="avatar" id="wallet-avatar"></div><b id="wallet-name"></b></div>
+  <div class="balances">
+    <div><small data-i18n="coins"></small><b>🪙 <span id="wallet-coins">0</span></b></div>
+    <div><small data-i18n="diamonds"></small><b>💎 <span id="wallet-diamonds">0</span></b></div>
+  </div>
+  <div class="packs" id="packs"></div>
+  <p class="tiny muted" data-i18n="demoPay"></p>
+  <h4 data-i18n="earnings"></h4>
+  <p class="tiny muted" id="earnings-d"></p>
+  <button class="btn ghost" disabled data-i18n="withdraw"></button>
+  <button class="link danger" data-action="logout" data-i18n="logout"></button>
+</div>
+
+<div class="sheet hidden" id="sheet-pk">
+  <div class="sheet-head"><h3 data-i18n="pk_title"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
+  <div id="pk-list" class="pk-list"></div>
+</div>
+
+<div class="sheet hidden" id="sheet-confirm">
+  <p id="confirm-text"></p>
+  <div class="row">
+    <button class="btn ghost" id="confirm-no"></button>
+    <button class="btn primary" id="confirm-yes"></button>
+  </div>
+</div>
+
+<div class="sheet hidden" id="sheet-report">
+  <h3 data-i18n="report"></h3>
+  <p class="muted" data-i18n="report_q"></p>
+  <div class="report-reasons" id="report-reasons"></div>
+</div>
+
+<div class="sheet hidden" id="sheet-user">
+  <div class="user-card"><span id="user-av"></span><b id="user-name"></b></div>
+  <div class="user-actions" id="user-actions"></div>
+</div>
+
+<div class="sheet hidden" id="sheet-inbox">
+  <div class="sheet-head"><h3 data-i18n="messages"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
+  <form class="dm-new" id="dm-new"><input id="dm-new-name" data-i18n-ph="dm_new" autocomplete="off" maxlength="20"><button class="btn primary sm" data-i18n="dm_start"></button></form>
+  <div class="conv-list" id="conv-list"></div>
+</div>
+
+<div class="sheet thread hidden" id="sheet-thread">
+  <div class="sheet-head">
+    <button class="icon-btn" data-action="inbox" title="back">‹</button>
+    <div class="thread-who"><span id="thread-av"></span><b id="thread-name"></b></div>
+    <button class="link" id="thread-block"></button>
+  </div>
+  <div class="thread-msgs" id="thread-msgs"></div>
+  <p class="tiny muted hidden" id="thread-blocked"></p>
+  <form class="dm-form" id="dm-form"><input id="dm-input" maxlength="500" autocomplete="off" data-i18n-ph="dm_send_ph"><button class="btn primary sm" data-i18n="send"></button></form>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="i18n.js"></script>
+<script src="rtc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

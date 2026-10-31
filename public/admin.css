@@ -1,0 +1,55 @@
+/* Yonetim paneline ozel gorunum; temel renkler ve bilesenler style.css'ten gelir. */
+.a-login { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; }
+.a-login form { display: flex; flex-direction: column; gap: 10px; }
+.a-main { max-width: 1100px; margin: 0 auto; padding: 0 16px 60px; }
+.a-tag { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--card); color: var(--muted); }
+
+.a-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 4px 0 18px; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+.stat small { color: var(--muted); font-size: 12px; }
+.stat b { font-size: 24px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+.stat.warn { border-color: rgba(255,107,139,.6); }
+.stat.warn b { color: #ff6b8b; }
+
+.count { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.12); margin-left: 4px; }
+.count:empty { display: none; }
+.count.alert { background: var(--pink); color: #fff; }
+.tabs button.active .count { background: rgba(0,0,0,.15); }
+
+.a-list { display: flex; flex-direction: column; gap: 8px; }
+.a-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); flex-wrap: wrap; }
+.a-item .info { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 2px; }
+.a-item .info small { color: var(--muted); font-size: 12px; }
+.a-item .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.a-item .btn { padding: 8px 14px; font-size: 13px; }
+.btn.danger { background: #c9184a; color: #fff; }
+.chip { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; background: var(--line); color: var(--text); margin-right: 6px; vertical-align: 1px; }
+.chip.pk { background: var(--gold); color: #000; }
+.chip.red { background: #c9184a; color: #fff; }
+.a-empty { padding: 40px 0; text-align: center; color: var(--muted); }
+
+.a-filter { display: flex; gap: 6px; margin-bottom: 10px; }
+.a-filter button { padding: 6px 12px; border-radius: 999px; font-size: 13px; color: var(--muted); border: 1px solid var(--line); }
+.a-filter button.active { color: var(--text); border-color: var(--pink); }
+
+/* Kullanicilar */
+.inline-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.inline-form input { flex: 1 1 140px; width: auto; }
+.inline-form .btn { flex: none; }
+.users-search { margin-bottom: 8px; }
+#u-summary { margin-bottom: 8px; }
+.online-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; margin-left: 6px; vertical-align: 1px; }
+.u-nums { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.u-nums b { color: var(--text); font-weight: 700; }
+.pager { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+.pager .btn { padding: 7px 14px; font-size: 13px; }
+
+/* Deneme hesaplari */
+.demo-note { margin-bottom: 10px; }
+.demo-form { margin-bottom: 12px; }
+.demo-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); flex: 1 1 140px; }
+.demo-form input { width: 100%; flex: none; }
+.demo-form .btn { align-self: flex-end; }
+.demo-pass { font-family: ui-monospace, Consolas, monospace; letter-spacing: .5px; }
+.demo-clear { margin-top: 12px; }

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0d0a14">
+  <title>Lafello Yönetim</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%23ff2d6f'/><circle cx='16' cy='16' r='5' fill='white'/></svg>">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+
+<section id="a-login" class="a-login hidden">
+  <div class="auth-card">
+    <div class="logo big"><span class="dot"></span>Lafello</div>
+    <p class="muted">Yönetim paneli</p>
+    <form id="a-login-form">
+      <p id="a-login-hint" class="muted tiny"></p>
+      <input id="a-pass" type="password" autocomplete="current-password" placeholder="Yönetici şifresi" required>
+      <input id="a-pass2" type="password" autocomplete="new-password" placeholder="Şifreyi tekrar yaz" class="hidden">
+      <p class="error" id="a-login-error"></p>
+      <button class="btn primary" id="a-login-btn" type="submit">Giriş yap</button>
+    </form>
+  </div>
+</section>
+
+<section id="a-main" class="a-main hidden">
+  <header class="topbar">
+    <div class="logo"><span class="dot"></span>Lafello <span class="a-tag">Yönetim</span></div>
+    <div class="topbar-right">
+      <span class="muted tiny" id="a-updated"></span>
+      <button class="lang-btn" id="a-logout">Çıkış</button>
+    </div>
+  </header>
+
+  <div class="a-stats" id="a-stats"></div>
+
+  <nav class="tabs" id="a-tabs">
+    <button data-tab="rooms" class="active">Canlı yayınlar <span class="count" id="c-rooms"></span></button>
+    <button data-tab="users">Kullanıcılar <span class="count" id="c-users"></span></button>
+    <button data-tab="reports">Şikayetler <span class="count alert" id="c-reports"></span></button>
+    <button data-tab="banned">Kapatılan hesaplar <span class="count" id="c-banned"></span></button>
+    <button data-tab="demo">Deneme hesapları <span class="count" id="c-demo"></span></button>
+  </nav>
+
+  <div id="tab-rooms" class="a-list"></div>
+  <div id="tab-reports" class="hidden">
+    <div class="a-filter">
+      <button data-filter="open" class="active">Bekleyenler</button>
+      <button data-filter="resolved">Çözülenler</button>
+    </div>
+    <div class="a-list" id="a-reports"></div>
+  </div>
+  <div id="tab-banned" class="a-list hidden"></div>
+
+  <div id="tab-demo" class="hidden">
+    <p class="muted tiny demo-note">Uygulamayı denemek için hazır hesaplar. Sen ya da arkadaşların bu hesaplarla farklı telefonlardan girip yayın açabilir, hediye gönderebilir, mesajlaşabilirsiniz. Kendiliğinden bir şey yapmazlar. İstatistiklere sayılmazlar.</p>
+    <form class="inline-form demo-form" id="demo-form">
+      <label>Kaç hesap <input type="number" id="demo-count" min="1" max="20" value="3"></label>
+      <label>Başlangıç jetonu <input type="number" id="demo-coins" min="0" max="100000" value="1000"></label>
+      <button class="btn primary" type="submit">Hesap aç</button>
+    </form>
+    <div class="a-list" id="demo-list"></div>
+    <button class="btn ghost demo-clear hidden" id="demo-clear">Tüm deneme hesaplarını sil</button>
+  </div>
+
+  <div id="tab-users" class="hidden">
+    <div class="inline-form users-search">
+      <input id="u-search" type="search" placeholder="Kullanıcı adıyla ara" autocomplete="off">
+    </div>
+    <p class="muted tiny" id="u-summary"></p>
+    <div class="a-list" id="u-list"></div>
+    <div class="pager" id="u-pager"></div>
+  </div>
+
+</section>
+
+<div class="sheet-backdrop hidden" id="backdrop"></div>
+<div class="sheet hidden" id="sheet-confirm">
+  <p id="confirm-text"></p>
+  <div class="row">
+    <button class="btn ghost" id="confirm-no">Vazgeç</button>
+    <button class="btn primary" id="confirm-yes"></button>
+  </div>
+</div>
+<div class="sheet hidden" id="sheet-coins">
+  <h3 id="coins-title"></h3>
+  <p class="muted tiny">Eklemek için pozitif, düşmek için eksi sayı yaz. Örneğin 100 ya da -50. Bakiye sıfırın altına inmez.</p>
+  <input id="coins-amount" type="number" step="1" placeholder="Jeton miktarı">
+  <div class="row">
+    <button class="btn ghost" id="coins-no">Vazgeç</button>
+    <button class="btn primary" id="coins-yes">Uygula</button>
+  </div>
+</div>
+<div class="toast hidden" id="toast"></div>
+
+<script src="admin.js"></script>
+</body>
+</html>
