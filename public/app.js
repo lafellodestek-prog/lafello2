@@ -1012,6 +1012,9 @@ $('#golive-start').onclick = goLive;
 
 // ---------- Baslangic ----------
 
+// Telefona yuklenebilmesi icin hizmet calisani.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
 (async function boot() {
   applyLang();
   try {
