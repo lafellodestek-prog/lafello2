@@ -263,3 +263,8 @@ input:focus { border-color: var(--pink); }
 .bubble { align-self: flex-start; max-width: 80%; background: var(--card); padding: 8px 12px; border-radius: 16px 16px 16px 4px; font-size: 14px; word-wrap: break-word; white-space: pre-wrap; }
 .bubble.mine { align-self: flex-end; background: var(--grad); border-radius: 16px 16px 4px 16px; }
 .bubble small { display: block; font-size: 10px; opacity: .7; text-align: right; margin-top: 2px; }
+
+/* Yasal baglantilar ve hesap silme */
+.legal-links { text-align: center; font-size: 13px; color: var(--muted); }
+.legal-links a { color: var(--muted); }
+.btn.danger-btn { background: #c9184a; color: #fff; }

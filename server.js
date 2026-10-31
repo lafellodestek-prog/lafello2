@@ -17,7 +17,8 @@ const server = createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 64 * 1024 });
 
 app.use(express.json({ limit: '10kb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// extensions: /gizlilik gibi adresler gizlilik.html sayfasini acar.
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 function auth(req, res, next) {
   const user = db.userByToken((req.headers.authorization || '').replace(/^Bearer /, ''));
@@ -58,6 +59,15 @@ app.post('/api/logout', auth, (req, res) => {
 });
 
 app.get('/api/me', auth, (req, res) => res.json({ user: req.user }));
+
+// Kullanici kendi hesabini siler (Google Play zorunlulugu). Sifre tekrar sorulur.
+app.post('/api/account/delete', auth, (req, res) => {
+  const check = db.checkLogin(req.user.name, req.body?.pass);
+  if (!check || check.banned) return res.status(400).json({ error: 'pass' });
+  closeConnections(req.user.id);
+  db.deleteUserData(req.user.id);
+  res.json({ ok: true });
+});
 
 app.post('/api/buy', auth, (req, res) => {
   const pack = PACKS.find((p) => p.id === req.body?.pack);
@@ -588,13 +598,17 @@ app.post('/api/admin/demo', adminAuth, (req, res) => {
 });
 
 // Silinen deneme hesabinin acik yayini kapanir, baglantisi kesilir.
-function removeDemo(id) {
+function closeConnections(id) {
   for (const r of [...rooms.values()]) if (r.hostId === id) endRoom(r, true);
   for (const sid of userSockets.get(id) || []) {
     const s = sock(sid);
     s?.emit('account:deleted');
     s?.disconnect(true);
   }
+}
+
+function removeDemo(id) {
+  closeConnections(id);
   return db.deleteDemoUser(id);
 }
 

@@ -957,6 +957,11 @@ document.addEventListener('click', async (e) => {
     case 'inbox':
       openInbox();
       break;
+    case 'delete-account':
+      $('#delete-pass').value = '';
+      $('#delete-error').textContent = '';
+      openSheet('delete');
+      break;
     case 'close-sheet':
       closeSheets();
       break;
@@ -1009,6 +1014,19 @@ $$('#sheet-golive .choice').forEach((b) => {
   };
 });
 $('#golive-start').onclick = goLive;
+
+$('#delete-yes').onclick = async () => {
+  const pass = $('#delete-pass').value;
+  if (!pass) return;
+  try {
+    await api('/api/account/delete', { pass });
+  } catch (err) {
+    $('#delete-error').textContent = t(err.code === 'pass' ? 'err_pass_wrong' : 'err_net');
+    return;
+  }
+  await logout();
+  $('#auth-error').textContent = t('err_deleted');
+};
 
 // ---------- Baslangic ----------
 

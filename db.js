@@ -347,13 +347,26 @@ export function listDemoUsers() {
 }
 
 export function deleteDemoUser(id) {
-  const u = db.prepare('SELECT id FROM users WHERE id = ? AND is_demo = 1').get(id);
-  if (!u) return false;
-  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
-  db.prepare('DELETE FROM dms WHERE from_id = ? OR to_id = ?').run(id, id);
-  db.prepare('DELETE FROM blocks WHERE user_id = ? OR blocked_id = ?').run(id, id);
-  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  if (!db.prepare('SELECT 1 FROM users WHERE id = ? AND is_demo = 1').get(id)) return false;
+  deleteUserData(id);
   return true;
+}
+
+// Hesabin kisisel verilerini kalici olarak siler. Hediye ve satin alma kayitlarinda yalniz
+// sayisal kimlik kalir; kullanici satiri silindigi icin kimseyle iliskilendirilemez.
+export function deleteUserData(id) {
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM dms WHERE from_id = ? OR to_id = ?').run(id, id);
+    db.prepare('DELETE FROM blocks WHERE user_id = ? OR blocked_id = ?').run(id, id);
+    db.prepare('DELETE FROM reports WHERE from_id = ?').run(id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 }
 
 // ---------- Yedekleme ----------
