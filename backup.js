@@ -10,7 +10,9 @@ const OBJECT = 'lafello.db';
 
 export const enabled = !!(BASE && KEY);
 
-const headers = (extra = {}) => ({ Authorization: `Bearer ${KEY}`, apikey: KEY, ...extra });
+// Eski tip anahtar (service_role, "eyJ..." ile baslar) hem apikey hem Authorization basliginda gider;
+// yeni tip gizli anahtar ("sb_secret_...") yalniz apikey basliginda gonderilir.
+const headers = (extra = {}) => ({ apikey: KEY, ...(KEY.startsWith('eyJ') ? { Authorization: `Bearer ${KEY}` } : {}), ...extra });
 
 async function ensureBucket() {
   const res = await fetch(`${BASE}/storage/v1/bucket`, {
