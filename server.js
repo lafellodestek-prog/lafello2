@@ -107,7 +107,19 @@ app.get('/api/dm/:name', auth, (req, res) => {
 const lastDm = new Map();
 // ---------- Bildirimler ----------
 
-app.get('/api/push/key', (req, res) => res.json({ key: push.publicKey }));
+app.get('/api/push/key', (req, res) => res.json({ key: push.publicKey, fcm: push.fcmEnabled() }));
+
+app.post('/api/push/fcm', auth, (req, res) => {
+  const token = req.body?.token;
+  if (typeof token !== 'string' || token.length < 20 || token.length > 4096) return res.status(400).json({ error: 'token' });
+  db.addFcmToken(req.user.id, token, req.body?.lang);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/fcm/remove', auth, (req, res) => {
+  if (db.fcmTokensFor(req.user.id).some((t) => t.token === req.body?.token)) db.removeFcmToken(req.body.token);
+  res.json({ ok: true });
+});
 
 app.post('/api/push/subscribe', auth, (req, res) => {
   const sub = req.body?.sub;
@@ -123,9 +135,11 @@ app.post('/api/push/unsubscribe', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Uygulamasi acik olmayan kullaniciya telefon bildirimi gider (acik olana uygulama icinde gosterilir).
+// Uygulamasi onunde olmayan kullaniciya telefon bildirimi gider (onunde olana uygulama icinde gosterilir).
+// Arka plana alinan uygulama baglantisini bir sure korur; bu yuzden "away" bilgisine de bakilir.
 function notifyIfAway(userId, payload) {
-  if (!userSockets.get(userId)?.size) push.pushToUser(userId, payload);
+  const here = [...(userSockets.get(userId) || [])].some((id) => sock(id) && !sock(id).data.away);
+  if (!here) push.pushToUser(userId, payload);
 }
 
 app.post('/api/dm/:name', auth, (req, res) => {
@@ -459,6 +473,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('room:leave', () => leaveRoom(socket));
+  socket.on('presence', ({ away } = {}) => (socket.data.away = !!away));
 
   let lastChat = 0;
   socket.on('chat', ({ text } = {}) => {

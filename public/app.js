@@ -327,6 +327,7 @@ function connectSocket() {
   });
   socket.on('pk:end', onPkEnd);
   socket.on('connect', () => {
+    socket.emit('presence', { away: document.hidden });
     // Baglanti koptuysa oda artik gecersizdir; ana sayfaya don.
     if (state.room && state.room._socketId && state.room._socketId !== socket.id) leaveRoom(true);
   });
@@ -698,15 +699,6 @@ function onFollowLive(n) {
   box.classList.remove('hidden');
   clearTimeout(state.liveAlertTimer);
   state.liveAlertTimer = setTimeout(() => box.classList.add('hidden'), 12000);
-  try {
-    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-      const note = new Notification('Lafello', { body: `${text} ${n.title}`, icon: '/icons/icon-192.png' });
-      note.onclick = () => {
-        window.focus();
-        joinRoom(n.roomId);
-      };
-    }
-  } catch {}
 }
 
 $('#live-alert').onclick = (e) => {
@@ -1193,7 +1185,7 @@ document.addEventListener('click', async (e) => {
       openDaily(false);
       break;
     case 'push':
-      if (state.pushOn) disablePush().then(() => toast(t('push_off')));
+      if (state.pushOn) disablePush(true).then(() => toast(t('push_off')));
       else enablePush(false);
       break;
     case 'delete-account':
@@ -1269,10 +1261,15 @@ $('#delete-yes').onclick = async () => {
 
 // ---------- Telefon bildirimleri ----------
 
-const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+document.addEventListener('visibilitychange', () => state.socket?.emit('presence', { away: document.hidden }));
+
+// Android uygulamasinda bildirimler uygulamanin kendisinden (Firebase) gelir; sitede tarayicidan.
+const androidApp = () => window.LafelloApp;
+const webPushOk = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const pushSupported = () => !!androidApp() || webPushOk();
 
 async function pushSubscription() {
-  if (!pushSupported()) return null;
+  if (!webPushOk()) return null;
   const reg = await navigator.serviceWorker.ready;
   return reg.pushManager.getSubscription();
 }
@@ -1282,25 +1279,50 @@ function urlKey(b64) {
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 }
 
+// Uygulamadan bildirim izni ve cihaz anahtari ister. Cevap window.lafelloPush ile gelir.
+function androidToken(ask) {
+  return new Promise((resolve) => {
+    window.lafelloPush = (token) => resolve(token || '');
+    try {
+      androidApp().requestPush(!!ask);
+    } catch {
+      resolve('');
+    }
+    setTimeout(() => resolve(''), 20000);
+  });
+}
+
 // Izin ister, cihazi bu hesaba abone eder. quiet: izin zaten verildiyse sessizce yeniler.
 async function enablePush(quiet) {
   if (!pushSupported()) {
     if (!quiet) toast(t('push_unsupported'));
     return false;
   }
+  if (quiet && store.get('sahne_push_off')) return false;
   try {
-    if (quiet && Notification.permission !== 'granted') return false;
-    if ((await Notification.requestPermission()) !== 'granted') {
-      if (!quiet) toast(t('push_denied'));
-      return false;
+    if (androidApp()) {
+      const token = await androidToken(!quiet);
+      if (!token) {
+        if (!quiet) toast(t('push_denied'));
+        return false;
+      }
+      await api('/api/push/fcm', { token, lang: state.lang });
+      state.fcmToken = token;
+    } else {
+      if (quiet && Notification.permission !== 'granted') return false;
+      if ((await Notification.requestPermission()) !== 'granted') {
+        if (!quiet) toast(t('push_denied'));
+        return false;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const { key } = await api('/api/push/key');
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(key) });
+      }
+      await api('/api/push/subscribe', { sub: sub.toJSON(), lang: state.lang });
     }
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      const { key } = await api('/api/push/key');
-      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(key) });
-    }
-    await api('/api/push/subscribe', { sub: sub.toJSON(), lang: state.lang });
+    store.del('sahne_push_off');
     state.pushOn = true;
     renderPushBtn();
     if (!quiet) toast(t('push_ok'));
@@ -1311,14 +1333,20 @@ async function enablePush(quiet) {
   }
 }
 
-async function disablePush() {
+// byUser: kullanici kendisi kapattiysa bir sonraki acilista sessizce yeniden acilmaz.
+async function disablePush(byUser) {
   try {
+    if (state.fcmToken) {
+      await api('/api/push/fcm/remove', { token: state.fcmToken }).catch(() => {});
+      state.fcmToken = null;
+    }
     const sub = await pushSubscription();
     if (sub) {
       await api('/api/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
       await sub.unsubscribe();
     }
   } catch {}
+  if (byUser) store.set('sahne_push_off', '1');
   state.pushOn = false;
   renderPushBtn();
 }

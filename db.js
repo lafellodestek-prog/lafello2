@@ -84,6 +84,13 @@ db.exec(`
     at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
+  CREATE TABLE IF NOT EXISTS fcm_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    lang TEXT NOT NULL DEFAULT 'tr',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS fcm_tokens_user ON fcm_tokens (user_id);
 `);
 
 // Sonradan eklenen sutunlar: eski veritabanlarina da eklenir.
@@ -350,7 +357,9 @@ export function adminStats() {
     demoUsers: one('SELECT COUNT(*) FROM users WHERE is_demo = 1'),
     openReports: one("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
     banned: one('SELECT COUNT(*) FROM users WHERE banned = 1'),
-    pushUsers: one('SELECT COUNT(DISTINCT p.user_id) FROM push_subs p JOIN users u ON u.id = p.user_id WHERE u.banned = 0'),
+    pushUsers: one(
+      'SELECT COUNT(DISTINCT x.user_id) FROM (SELECT user_id FROM push_subs UNION ALL SELECT user_id FROM fcm_tokens) x JOIN users u ON u.id = x.user_id WHERE u.banned = 0',
+    ),
   };
 }
 
@@ -454,6 +463,7 @@ export function deleteUserData(id) {
     db.prepare('DELETE FROM blocks WHERE user_id = ? OR blocked_id = ?').run(id, id);
     db.prepare('DELETE FROM follows WHERE follower_id = ? OR followee_id = ?').run(id, id);
     db.prepare('DELETE FROM push_subs WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM fcm_tokens WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM reports WHERE from_id = ?').run(id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     db.exec('COMMIT');
@@ -553,3 +563,14 @@ export function addPushSub(userId, sub, lang) {
 export const removePushSub = (endpoint) => db.prepare('DELETE FROM push_subs WHERE endpoint = ?').run(endpoint);
 export const pushSubsFor = (userId) => db.prepare('SELECT * FROM push_subs WHERE user_id = ?').all(userId);
 export const allPushSubs = () => db.prepare('SELECT p.* FROM push_subs p JOIN users u ON u.id = p.user_id WHERE u.banned = 0').all();
+
+// Android uygulamasinin Firebase anahtarlari (cihaz basina bir tane).
+export function addFcmToken(userId, token, lang) {
+  db.prepare(
+    `INSERT INTO fcm_tokens (token, user_id, lang, at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id, lang = excluded.lang`,
+  ).run(token, userId, lang === 'en' ? 'en' : 'tr', Date.now());
+}
+export const removeFcmToken = (token) => db.prepare('DELETE FROM fcm_tokens WHERE token = ?').run(token);
+export const fcmTokensFor = (userId) => db.prepare('SELECT * FROM fcm_tokens WHERE user_id = ?').all(userId);
+export const allFcmTokens = () => db.prepare('SELECT f.* FROM fcm_tokens f JOIN users u ON u.id = f.user_id WHERE u.banned = 0').all();
