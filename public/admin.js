@@ -158,7 +158,7 @@ function render() {
   $('#c-rooms').textContent = rooms.length || '';
   $('#c-users').textContent = s.users || '';
   $('#c-demo').textContent = s.demoUsers || '';
-  $('#push-count').textContent = fmt(s.pushUsers || 0);
+  $('#push-count').textContent = `${fmt(s.pushUsers || 0)} kişi (${fmt(s.pushApp || 0)} telefon uygulaması, ${fmt(s.pushWeb || 0)} tarayıcı)`;
   $('#c-reports').textContent = s.openReports || '';
   $('#c-banned').textContent = banned.length || '';
 
@@ -229,8 +229,12 @@ $('#push-form').onsubmit = async (e) => {
   if (!title || !body) return;
   if (!(await confirmBox(`"${title}" bildirimi bildirim alan herkese gönderilsin mi?`, 'Gönder'))) return;
   try {
-    const { sent } = await api('/api/admin/push', { title, body });
-    toast(`Bildirim ${fmt(sent)} cihaza gönderildi.`);
+    const r = await api('/api/admin/push', { title, body });
+    const lines = [`Bildirim ${fmt(r.sent)} cihaza gönderildi.`, `Telefon uygulaması: ${fmt(r.appOk)}/${fmt(r.app)}`, `Tarayıcı: ${fmt(r.webOk)}/${fmt(r.web)}`];
+    if (!r.appOn) lines.push('Uygulama bildirimleri sunucuda kapalı (Firebase anahtarı yok).');
+    if (r.error) lines.push(`Hata: ${r.error}`);
+    $('#push-result').textContent = lines.join('\n');
+    toast(lines[0]);
     $('#push-form').reset();
   } catch (err) {
     toast(err.message === 'wait' ? 'Az önce gönderdin, 30 saniye bekle.' : 'Gönderilemedi, tekrar dene.');

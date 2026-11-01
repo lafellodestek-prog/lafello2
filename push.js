@@ -51,7 +51,7 @@ async function fcmAccess() {
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${sig}` }),
   });
   const data = await res.json();
-  if (!data.access_token) throw new Error('fcm auth');
+  if (!data.access_token) throw new Error(`Google girisi reddedildi: ${data.error_description || data.error || res.status}`);
   fcmToken = { value: data.access_token, until: Date.now() + (data.expires_in - 300) * 1000 };
   return fcmToken.value;
 }
@@ -66,7 +66,8 @@ async function sendFcm(t, msg) {
   if (res.ok) return true;
   // Uygulama silinmis ya da anahtar gecersizse listeden cikar.
   if (res.status === 404 || res.status === 400) db.removeFcmToken(t.token);
-  return false;
+  const err = await res.json().catch(() => ({}));
+  throw new Error(`FCM ${res.status} ${err.error?.status || ''} ${err.error?.message || ''}`.trim());
 }
 
 // ---------- Gonderim ----------
@@ -74,8 +75,9 @@ async function sendFcm(t, msg) {
 // Bildirim metni abonenin diline gore secilir: payload { tr: {...}, en: {...}, url, tag }.
 const textFor = (payload, lang) => payload[lang] || payload.tr;
 
+// Sonuc: kac tarayiciya ve kac uygulamaya gittigi, ilk hata (yonetim panelinde gosterilir).
 async function sendTo(subs, tokens, payload) {
-  let sent = 0;
+  const r = { sent: 0, web: subs.length, webOk: 0, app: tokens.length, appOk: 0, appOn: !!fcmAccount, error: null };
   for (let i = 0; i < subs.length; i += 100) {
     await Promise.all(
       subs.slice(i, i + 100).map(async (s) => {
@@ -83,27 +85,32 @@ async function sendTo(subs, tokens, payload) {
         const body = JSON.stringify({ title: text.title, body: text.body, url: payload.url || '/', tag: payload.tag });
         try {
           await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body, { TTL: 6 * 3600 });
-          sent++;
+          r.webOk++;
         } catch (e) {
+          r.error ||= `Tarayici: ${e.statusCode || ''} ${e.body || e.message}`.slice(0, 300);
           // Abonelik artik gecersizse (uygulama silinmis, izin geri alinmis) listeden cikar.
           if (e.statusCode === 404 || e.statusCode === 410) db.removePushSub(s.endpoint);
         }
       }),
     );
   }
-  if (!fcmAccount) return sent;
+  if (!fcmAccount) return ((r.sent = r.webOk), r);
   for (let i = 0; i < tokens.length; i += 100) {
     await Promise.all(
       tokens.slice(i, i + 100).map(async (t) => {
         const text = textFor(payload, t.lang);
         try {
-          if (await sendFcm(t, { title: text.title, body: text.body, url: payload.url || '/', tag: payload.tag || '' })) sent++;
-        } catch {}
+          if (await sendFcm(t, { title: text.title, body: text.body, url: payload.url || '/', tag: payload.tag || '' })) r.appOk++;
+        } catch (e) {
+          r.error ||= `Uygulama: ${e.message}`.slice(0, 300);
+        }
       }),
     );
   }
-  return sent;
+  r.sent = r.webOk + r.appOk;
+  if (r.error) console.error('Bildirim hatasi:', r.error);
+  return r;
 }
 
-export const pushToUser = (userId, payload) => sendTo(db.pushSubsFor(userId), db.fcmTokensFor(userId), payload).catch(() => 0);
+export const pushToUser = (userId, payload) => sendTo(db.pushSubsFor(userId), db.fcmTokensFor(userId), payload).catch(() => null);
 export const pushToAll = (payload) => sendTo(db.allPushSubs(), db.allFcmTokens(), payload);

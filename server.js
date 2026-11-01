@@ -753,8 +753,7 @@ app.post('/api/admin/push', adminAuth, async (req, res) => {
   if (Date.now() - lastBroadcast < 30000) return res.status(429).json({ error: 'wait' });
   lastBroadcast = Date.now();
   const text = { title, body };
-  const sent = await push.pushToAll({ tr: text, en: text, url: '/', tag: `admin-${Date.now()}` });
-  res.json({ sent });
+  res.json(await push.pushToAll({ tr: text, en: text, url: '/', tag: `admin-${Date.now()}` }));
 });
 
 // ---------- Deneme hesaplari ----------

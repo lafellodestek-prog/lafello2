@@ -61,3 +61,4 @@
 .push-form { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
 .push-form textarea { width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); color: inherit; outline: none; resize: vertical; font: inherit; }
 .push-form textarea:focus { border-color: var(--pink); }
+.push-result { margin-top: 12px; white-space: pre-wrap; font: 13px/1.5 inherit; max-width: 520px; }

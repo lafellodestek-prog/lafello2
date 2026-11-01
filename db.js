@@ -357,6 +357,8 @@ export function adminStats() {
     demoUsers: one('SELECT COUNT(*) FROM users WHERE is_demo = 1'),
     openReports: one("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
     banned: one('SELECT COUNT(*) FROM users WHERE banned = 1'),
+    pushWeb: one('SELECT COUNT(*) FROM push_subs'),
+    pushApp: one('SELECT COUNT(*) FROM fcm_tokens'),
     pushUsers: one(
       'SELECT COUNT(DISTINCT x.user_id) FROM (SELECT user_id FROM push_subs UNION ALL SELECT user_id FROM fcm_tokens) x JOIN users u ON u.id = x.user_id WHERE u.banned = 0',
     ),

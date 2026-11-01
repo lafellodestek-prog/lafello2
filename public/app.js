@@ -1288,7 +1288,7 @@ function androidToken(ask) {
     } catch {
       resolve('');
     }
-    setTimeout(() => resolve(''), 20000);
+    setTimeout(() => resolve(''), 60000);
   });
 }
 
