@@ -23,3 +23,7 @@ export const HOST_SHARE = 0.6;
 export const PK_SECONDS = 180;
 export const VOICE_SEATS = 8;
 export const SIGNUP_BONUS = 50;
+
+// Odullu reklam: izleyen kullanici jeton kazanir (gunde en fazla AD_DAILY kez).
+export const AD_REWARD = 10;
+export const AD_DAILY = 5;

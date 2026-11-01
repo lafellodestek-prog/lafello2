@@ -10,7 +10,7 @@ import * as db from './db.js';
 import * as push from './push.js';
 import { gameList, gameCategories } from './games.js';
 import { attachArena, arenaSocket, arenaDisconnect } from './arena.js';
-import { GIFTS, PACKS, HOST_SHARE, PK_SECONDS, VOICE_SEATS } from './config.js';
+import { GIFTS, PACKS, HOST_SHARE, PK_SECONDS, VOICE_SEATS, AD_REWARD, AD_DAILY } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -217,6 +217,31 @@ app.post('/api/daily/claim', auth, (req, res) => {
   if (!r) return res.status(400).json({ error: 'claimed' });
   pushWallet(r.user);
   res.json(r);
+});
+
+// ---------- Odullu reklam (Android uygulamasi) ----------
+// Reklam baslarken tek kullanimlik bir bilet alinir; reklam bitince bilet en erken 10 saniye sonra
+// jetona cevrilir. Gunluk sinir ve bilet sayesinde sahte isteklerle sinirsiz jeton alinamaz.
+const adTickets = new Map(); // bilet -> { userId, at }
+
+app.get('/api/ads', auth, (req, res) => res.json({ left: db.adsLeft(req.user.id, AD_DAILY), reward: AD_REWARD, daily: AD_DAILY }));
+
+app.post('/api/ads/start', auth, (req, res) => {
+  if (db.adsLeft(req.user.id, AD_DAILY) <= 0) return res.status(400).json({ error: 'limit' });
+  for (const [k, v] of adTickets) if (v.userId === req.user.id || Date.now() - v.at > 10 * 60 * 1000) adTickets.delete(k);
+  const ticket = randomBytes(12).toString('hex');
+  adTickets.set(ticket, { userId: req.user.id, at: Date.now() });
+  res.json({ ticket });
+});
+
+app.post('/api/ads/claim', auth, (req, res) => {
+  const t = adTickets.get(String(req.body?.ticket || ''));
+  if (!t || t.userId !== req.user.id || Date.now() - t.at < 10000) return res.status(400).json({ error: 'ticket' });
+  adTickets.delete(String(req.body.ticket));
+  const user = db.claimAdReward(req.user.id, AD_REWARD, AD_DAILY);
+  if (!user) return res.status(400).json({ error: 'limit' });
+  pushWallet(user);
+  res.json({ reward: AD_REWARD, left: db.adsLeft(req.user.id, AD_DAILY), user });
 });
 
 app.get('/api/following', auth, (req, res) => res.json({ names: db.followingNames(req.user.id) }));

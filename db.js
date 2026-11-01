@@ -582,3 +582,22 @@ export function addXp(userId, amount) {
   q.addXp.run(amount, userId);
   return getUser(userId);
 }
+
+// ---------- Odullu reklam ----------
+// Gunluk izleme sayisi kullanici satirinda tutulur (Turkiye gunune gore sifirlanir).
+addColumn('users', 'ad_day', 'TEXT');
+addColumn('users', 'ad_count', 'INTEGER NOT NULL DEFAULT 0');
+
+export function adsLeft(userId, daily) {
+  const u = q.userById.get(userId);
+  return u.ad_day === trDay() ? Math.max(0, daily - u.ad_count) : daily;
+}
+
+export function claimAdReward(userId, coins, daily) {
+  if (adsLeft(userId, daily) <= 0) return null;
+  const today = trDay();
+  db.prepare(
+    `UPDATE users SET coins = coins + ?, ad_count = CASE WHEN ad_day = ? THEN ad_count + 1 ELSE 1 END, ad_day = ? WHERE id = ?`,
+  ).run(coins, today, today, userId);
+  return getUser(userId);
+}

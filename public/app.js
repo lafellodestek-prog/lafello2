@@ -1174,6 +1174,7 @@ document.addEventListener('click', async (e) => {
       applyLang();
       break;
     case 'wallet':
+      refreshAds();
       renderWallet();
       openSheet('wallet');
       break;
@@ -1197,6 +1198,9 @@ document.addEventListener('click', async (e) => {
       break;
     case 'mp-quit':
       quitMp();
+      break;
+    case 'ad':
+      watchRewardedAd();
       break;
     case 'push':
       if (state.pushOn) disablePush(true).then(() => toast(t('push_off')));
@@ -1328,6 +1332,7 @@ function closeGame(fromHistory) {
   if ($('#game-view').classList.contains('hidden')) return;
   $('#game-view').classList.add('hidden');
   $('#game-frame').src = 'about:blank';
+  maybeInterstitial();
   if (!fromHistory && history.state?.game) history.back();
 }
 
@@ -1533,6 +1538,7 @@ async function quitMp(fromHistory) {
   }
   state.socket.emit('mp:leave');
   state.mp = null;
+  maybeInterstitial();
   $('#mp-view').classList.add('hidden');
   if (!fromHistory && history.state?.mp) history.back();
 }
@@ -1552,6 +1558,66 @@ function mpSocket(socket) {
       renderMp();
     }
   });
+}
+
+// ---------- Reklamlar (yalniz Android uygulamasinda) ----------
+// Odullu reklam izleyen jeton kazanir; tam ekran reklam yalniz oyun bitince ve en fazla 3 dakikada bir cikar.
+
+const adsApp = () => typeof window.LafelloApp?.showRewarded === 'function';
+state.adsLeft = 0;
+state.lastInterstitial = Date.now();
+
+async function refreshAds() {
+  const b = $('#ad-btn');
+  b.classList.toggle('hidden', !adsApp());
+  if (!adsApp()) return;
+  try {
+    const r = await api('/api/ads');
+    state.adsLeft = r.left;
+    b.disabled = r.left <= 0;
+    b.textContent = r.left > 0 ? t('ad_watch', { n: r.reward, left: r.left }) : t('ad_done');
+  } catch {}
+}
+
+// Uygulama reklam sonucunu window.lafelloAd ile bildirir: 'reward', 'closed', 'failed'.
+function showAd(kind) {
+  return new Promise((resolve) => {
+    let rewarded = false;
+    window.lafelloAd = (ev) => {
+      if (ev === 'reward') rewarded = true;
+      if (ev === 'closed' || ev === 'failed') resolve(ev === 'failed' ? 'failed' : rewarded ? 'reward' : 'closed');
+    };
+    try {
+      if (kind === 'rewarded') window.LafelloApp.showRewarded();
+      else window.LafelloApp.showInterstitial();
+    } catch {
+      resolve('failed');
+    }
+  });
+}
+
+async function watchRewardedAd() {
+  const b = $('#ad-btn');
+  b.disabled = true;
+  try {
+    const { ticket } = await api('/api/ads/start', {});
+    const result = await showAd('rewarded');
+    if (result === 'reward') {
+      const r = await api('/api/ads/claim', { ticket });
+      state.user = r.user;
+      renderWallet();
+      toast(t('ad_ok', { n: r.reward }));
+    } else if (result === 'failed') toast(t('ad_none'));
+  } catch {
+    toast(t('ad_none'));
+  }
+  refreshAds();
+}
+
+function maybeInterstitial() {
+  if (!adsApp() || Date.now() - state.lastInterstitial < 3 * 60 * 1000) return;
+  state.lastInterstitial = Date.now();
+  showAd('interstitial');
 }
 
 // ---------- Telefon bildirimleri ----------
