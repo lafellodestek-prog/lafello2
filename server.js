@@ -188,6 +188,12 @@ async function iceServers() {
 
 app.get('/api/ice', auth, async (req, res) => res.json({ iceServers: await iceServers() }));
 
+// Aktarma hizmetinin calisip calismadigini gosterir (gizli bilgi icermez).
+app.get('/api/turn-status', async (req, res) => {
+  const servers = await iceServers();
+  res.json({ turn: servers.some((x) => [].concat(x.urls).some((u) => String(u).startsWith('turn'))) });
+});
+
 app.post('/api/block/:name', auth, (req, res) => {
   const other = db.dmTarget(req.params.name);
   if (!other || other.id === req.user.id) return res.status(404).json({ error: 'nouser' });
