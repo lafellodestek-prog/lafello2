@@ -1,8 +1,10 @@
 // Tarayicilar arasi goruntu/ses baglantilari.
 // Yayinci (publisher) her izleyiciye ayri bir baglanti acar; "tag" ayni kisiden gelen farkli akislari ayirir
 // (main: kendi yayini, pk: rakip yayinci, voice: sesli oda koltugu).
-window.createRtc = function createRtc(socket, { getStream, onTrack, onClose }) {
-  const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+window.createRtc = function createRtc(socket, { getStream, onTrack, onClose, iceServers }) {
+  // Sunucudan gelen aktarma (TURN) bilgisi varsa onu, yoksa yalniz STUN kullanilir.
+  const DEFAULT_ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+  const config = () => ({ iceServers: (iceServers && iceServers()) || DEFAULT_ICE });
   const outgoing = new Map();
   const incoming = new Map();
   const key = (id, tag) => `${id}|${tag}`;
@@ -23,7 +25,7 @@ window.createRtc = function createRtc(socket, { getStream, onTrack, onClose }) {
     const stream = getStream(tag);
     if (!stream) return;
     closeOut(from, tag);
-    const pc = new RTCPeerConnection(ICE);
+    const pc = new RTCPeerConnection(config());
     outgoing.set(key(from, tag), pc);
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
     pc.onicecandidate = (e) => e.candidate && send(from, tag, 'sub', { ice: e.candidate });
@@ -35,7 +37,7 @@ window.createRtc = function createRtc(socket, { getStream, onTrack, onClose }) {
     if (dir === 'sub') {
       if (data.sdp) {
         closeIn(from, tag);
-        const pc = new RTCPeerConnection(ICE);
+        const pc = new RTCPeerConnection(config());
         incoming.set(key(from, tag), pc);
         pc.ontrack = (e) => onTrack(from, tag, e.streams[0]);
         pc.onicecandidate = (e) => e.candidate && send(from, tag, 'pub', { ice: e.candidate });

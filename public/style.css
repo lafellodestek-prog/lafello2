@@ -268,3 +268,20 @@ input:focus { border-color: var(--pink); }
 .legal-links { text-align: center; font-size: 13px; color: var(--muted); }
 .legal-links a { color: var(--muted); }
 .btn.danger-btn { background: #c9184a; color: #fff; }
+
+/* Profil fotografi ve profil sayfasi */
+.pic { position: relative; overflow: hidden; }
+.pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.user-bio { font-size: 14px; max-width: 320px; white-space: pre-wrap; margin-top: 2px; }
+.user-stats { display: flex; gap: 24px; margin-top: 8px; }
+.user-stats div { display: flex; flex-direction: column; align-items: center; }
+.user-stats b { font-size: 16px; }
+.user-stats small { font-size: 12px; color: var(--muted); }
+.user-actions textarea { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); font: inherit; resize: none; }
+.user-actions label.btn { cursor: pointer; }
+.host-chip { cursor: pointer; }
+.wallet-me .link { margin-left: auto; }
+/* Takip edilenin canli bildirimi */
+.live-alert { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 45; width: calc(100% - 32px); max-width: 440px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: rgba(30,23,41,.97); border: 1px solid var(--pink); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.live-alert div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.live-alert small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

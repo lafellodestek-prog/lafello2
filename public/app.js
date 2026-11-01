@@ -27,6 +27,9 @@ const state = {
   pkTimer: null,
   pkEndsAt: 0,
   goliveType: 'video',
+  avatarV: {},
+  following: new Set(),
+  ice: null,
 };
 
 // ---------- Yardimcilar ----------
@@ -45,13 +48,18 @@ function hue(str) {
   for (const c of String(str)) h = (h * 31 + c.charCodeAt(0)) % 360;
   return h;
 }
+// Profil fotografi varsa bas harfin ustune biner; yoksa (404) resim kaldirilir ve bas harf gorunur.
+const avatarSrc = (name) => `/api/u/${encodeURIComponent(name)}/avatar${state.avatarV[name] ? `?v=${state.avatarV[name]}` : ''}`;
+const avatarInner = (name) =>
+  `${esc(String(name || '?').charAt(0).toUpperCase())}<img src="${avatarSrc(name)}" alt="" loading="lazy" onerror="this.remove()">`;
 function avatar(el, name) {
-  el.textContent = String(name || '?').charAt(0).toUpperCase();
+  el.classList.add('pic');
+  el.innerHTML = avatarInner(name);
   el.style.background = `linear-gradient(135deg, hsl(${hue(name)} 80% 60%), hsl(${(hue(name) + 50) % 360} 80% 45%))`;
 }
 function avatarHtml(name, cls = 'avatar') {
   const h = hue(name);
-  return `<span class="${cls}" style="background:linear-gradient(135deg,hsl(${h} 80% 60%),hsl(${(h + 50) % 360} 80% 45%))">${esc(String(name).charAt(0).toUpperCase())}</span>`;
+  return `<span class="${cls} pic" style="background:linear-gradient(135deg,hsl(${h} 80% 60%),hsl(${(h + 50) % 360} 80% 45%))">${avatarInner(name)}</span>`;
 }
 const fmt = (n) => Number(n).toLocaleString(state.lang === 'tr' ? 'tr-TR' : 'en-US');
 
@@ -166,6 +174,14 @@ function enterApp(user) {
   renderWallet();
   connectSocket();
   show('home');
+  // Goruntu baglantisi icin aktarma bilgisi ve takip edilenler arka planda yuklenir.
+  api('/api/ice').then((r) => (state.ice = r.iceServers)).catch(() => {});
+  api('/api/following')
+    .then((r) => {
+      state.following = new Set(r.names);
+      renderGrid();
+    })
+    .catch(() => {});
 }
 
 function renderWallet() {
@@ -200,7 +216,7 @@ $('#packs').onclick = async (e) => {
 
 function renderGrid() {
   const list = state.rooms.filter((r) =>
-    state.tab === 'all' ? true : state.tab === 'pk' ? r.inPk : r.type === state.tab,
+    state.tab === 'all' ? true : state.tab === 'pk' ? r.inPk : state.tab === 'following' ? state.following.has(r.hostName) : r.type === state.tab,
   );
   $('#room-empty').classList.toggle('hidden', list.length > 0);
   $('#room-grid').innerHTML = list
@@ -237,6 +253,7 @@ function connectSocket() {
 
   state.rtc = createRtc(socket, {
     getStream: (tag) => (tag === 'voice' ? state.micStream : state.isHost ? state.localStream : null),
+    iceServers: () => state.ice,
     onTrack: attachStream,
     onClose: detachStream,
   });
@@ -254,6 +271,7 @@ function connectSocket() {
   });
   socket.on('chat', addChat);
   socket.on('dm', onDm);
+  socket.on('follow:live', onFollowLive);
   socket.on('dm:sent', onDmSent);
   socket.on('dm:unread', setUnread);
   socket.on('gift', onGift);
@@ -530,6 +548,8 @@ function renderRoomActions() {
   $('#room-actions').innerHTML = btns.join('');
 }
 
+$('.host-chip').onclick = () => state.room && openProfile(state.room.hostName);
+
 $('#chat-form').onsubmit = (e) => {
   e.preventDefault();
   const text = $('#chat-input').value.trim();
@@ -559,24 +579,131 @@ $('#chat').onclick = (e) => {
 };
 
 function openUser(name) {
-  $('#user-av').innerHTML = avatarHtml(name, 'avatar big-av');
-  $('#user-name').textContent = name;
-  const btns = [];
-  btns.push(`<button class="btn primary" data-user-act="dm">${esc(t('dm_send'))}</button>`);
-  if (state.isHost && state.room) btns.push(`<button class="btn ghost" data-user-act="kick">${esc(t('kick'))}</button>`);
-  $('#user-actions').innerHTML = btns.join('');
-  $('#user-actions').dataset.name = name;
+  openProfile(name);
+}
+
+// ---------- Profil ----------
+
+async function openProfile(name) {
+  let p;
+  try {
+    ({ profile: p } = await api(`/api/u/${encodeURIComponent(name)}`));
+  } catch {
+    return toast(t('dm_nouser'));
+  }
+  state.profile = p;
+  renderProfile();
   openSheet('user');
+}
+
+function renderProfile() {
+  const p = state.profile;
+  $('#user-av').innerHTML = avatarHtml(p.name, 'avatar big-av');
+  $('#user-name').textContent = p.name;
+  $('#user-bio').textContent = p.bio || (p.me ? t('no_bio_me') : '');
+  $('#user-stats').innerHTML = `<div><b>${fmt(p.followers)}</b><small>${esc(t('followers'))}</small></div><div><b>${fmt(p.following)}</b><small>${esc(t('following_n'))}</small></div><div><b>🪙 ${fmt(p.giftsReceived)}</b><small>${esc(t('gifts_received'))}</small></div>`;
+  const btns = [];
+  if (p.live && !(state.room && state.room.id === p.live.id)) btns.push(`<button class="btn primary" data-user-act="watch">● ${esc(t('watch_live'))}</button>`);
+  if (p.me) {
+    btns.push(`<label class="btn ghost">${esc(t('change_photo'))}<input type="file" id="photo-file" accept="image/*" hidden></label>`);
+    btns.push(`<textarea id="bio-input" maxlength="150" rows="2" placeholder="${esc(t('bio_ph'))}">${esc(p.bio)}</textarea>`);
+    btns.push(`<button class="btn ghost" data-user-act="bio">${esc(t('save_bio'))}</button>`);
+  } else {
+    btns.push(`<button class="btn ${p.isFollowing ? 'ghost' : 'primary'}" data-user-act="follow">${esc(t(p.isFollowing ? 'unfollow' : 'follow'))}</button>`);
+    btns.push(`<button class="btn ghost" data-user-act="dm">${esc(t('dm_send'))}</button>`);
+    if (state.isHost && state.room) btns.push(`<button class="btn ghost" data-user-act="kick">${esc(t('kick'))}</button>`);
+  }
+  $('#user-actions').innerHTML = btns.join('');
+  $('#user-actions').dataset.name = p.name;
+  const file = $('#photo-file');
+  if (file) file.onchange = () => uploadPhoto(file.files[0]);
 }
 
 $('#user-actions').onclick = async (e) => {
   const act = e.target.closest('[data-user-act]')?.dataset.userAct;
   const { name } = $('#user-actions').dataset;
   if (act === 'dm') openThread(name);
+  if (act === 'watch') {
+    closeSheets();
+    joinRoom(state.profile.live.id);
+  }
+  if (act === 'follow') {
+    const follow = !state.profile.isFollowing;
+    try {
+      const { profile } = await api(`/api/u/${encodeURIComponent(name)}/follow`, { follow });
+      state.profile = { ...state.profile, ...profile };
+      if (follow) state.following.add(name);
+      else state.following.delete(name);
+      renderProfile();
+      renderGrid();
+      if (follow) askNotifyPermission();
+    } catch {
+      toast(t('err_net'));
+    }
+  }
+  if (act === 'bio') {
+    const bio = $('#bio-input').value;
+    await api('/api/me/bio', { bio }).catch(() => {});
+    state.profile.bio = bio.trim();
+    toast(t('saved'));
+  }
   if (act === 'kick') {
     closeSheets();
-    if ((await confirmBox(t('kick_q', { name }), state.lang === 'tr' ? 'Çıkar' : 'Remove'))) state.socket.emit('room:kick', { name });
+    if (await confirmBox(t('kick_q', { name }), state.lang === 'tr' ? 'Çıkar' : 'Remove')) state.socket.emit('room:kick', { name });
   }
+};
+
+// Secilen fotograf kare kirpilip 256 piksellik JPEG'e kucultulur, sonra yuklenir.
+async function uploadPhoto(file) {
+  if (!file) return;
+  try {
+    const img = await createImageBitmap(file);
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const s = Math.min(img.width, img.height);
+    c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 256, 256);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
+    const res = await fetch('/api/me/avatar', { method: 'POST', headers: { 'Content-Type': 'image/jpeg', Authorization: `Bearer ${state.token}` }, body: blob });
+    if (!res.ok) throw new Error('upload');
+    state.avatarV[state.user.name] = (await res.json()).version;
+    renderProfile();
+    renderWallet();
+    toast(t('photo_ok'));
+  } catch {
+    toast(t('photo_fail'));
+  }
+}
+
+// ---------- Takip edilenin canli bildirimi ----------
+
+function askNotifyPermission() {
+  try {
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  } catch {}
+}
+
+function onFollowLive(n) {
+  const text = t('live_now', { name: n.name });
+  const box = $('#live-alert');
+  box.innerHTML = `${avatarHtml(n.name)}<div><b>${esc(text)}</b><small>${esc(n.title)}</small></div><button class="btn primary sm" data-live-room="${n.roomId}">${esc(t('watch_live'))}</button>`;
+  box.classList.remove('hidden');
+  clearTimeout(state.liveAlertTimer);
+  state.liveAlertTimer = setTimeout(() => box.classList.add('hidden'), 12000);
+  try {
+    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+      const note = new Notification('Lafello', { body: `${text} ${n.title}`, icon: '/icons/icon-192.png' });
+      note.onclick = () => {
+        window.focus();
+        joinRoom(n.roomId);
+      };
+    }
+  } catch {}
+}
+
+$('#live-alert').onclick = (e) => {
+  const b = e.target.closest('[data-live-room]');
+  $('#live-alert').classList.add('hidden');
+  if (b) joinRoom(b.dataset.liveRoom);
 };
 
 // ---------- Ozel mesajlar ----------
@@ -956,6 +1083,9 @@ document.addEventListener('click', async (e) => {
       break;
     case 'inbox':
       openInbox();
+      break;
+    case 'my-profile':
+      openProfile(state.user.name);
       break;
     case 'delete-account':
       $('#delete-pass').value = '';

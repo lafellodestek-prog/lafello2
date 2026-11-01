@@ -120,6 +120,74 @@ app.post('/api/dm/:name', auth, (req, res) => {
   res.json({ message: { id: m.id, mine: true, text: m.text, at: m.at } });
 });
 
+// ---------- Profil ve takip ----------
+
+app.get('/api/u/:name/avatar', (req, res) => {
+  const a = db.getAvatar(req.params.name);
+  // Fotografi olmayanlarda istemci bas harfi gosterir; bos cevap kisa sure onbellekte tutulur.
+  if (!a) return res.set('Cache-Control', 'public, max-age=120').status(404).end();
+  res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600' }).send(Buffer.from(a.img));
+});
+
+app.get('/api/u/:name', auth, (req, res) => {
+  const p = db.getProfile(req.params.name, req.user.id);
+  if (!p) return res.status(404).json({ error: 'nouser' });
+  const live = [...rooms.values()].find((r) => r.hostId === p.id);
+  res.json({ profile: { ...p, id: undefined, me: p.id === req.user.id, live: live ? { id: live.id, title: live.title, type: live.type } : null } });
+});
+
+app.post('/api/u/:name/follow', auth, (req, res) => {
+  const p = db.getProfile(req.params.name, req.user.id);
+  if (!p || p.id === req.user.id) return res.status(400).json({ error: 'nouser' });
+  db.setFollow(req.user.id, p.id, req.body?.follow !== false);
+  res.json({ profile: { ...db.getProfile(req.params.name, req.user.id), id: undefined } });
+});
+
+app.get('/api/following', auth, (req, res) => res.json({ names: db.followingNames(req.user.id) }));
+
+app.post('/api/me/bio', auth, (req, res) => {
+  db.setBio(req.user.id, req.body?.bio);
+  res.json({ ok: true });
+});
+
+// Profil fotografi: istemci 256x256 JPEG'e kucultup ham olarak gonderir (en fazla 300 KB).
+app.post('/api/me/avatar', auth, express.raw({ type: 'image/jpeg', limit: '300kb' }), (req, res) => {
+  const buf = req.body;
+  // JPEG dosyalari FF D8 baytlariyla baslar; baska bir sey kabul edilmez.
+  if (!Buffer.isBuffer(buf) || buf.length < 100 || buf[0] !== 0xff || buf[1] !== 0xd8) return res.status(400).json({ error: 'image' });
+  res.json({ version: db.setAvatar(req.user.id, buf) });
+});
+
+// ---------- Baglanti yardimcisi (TURN) ----------
+// Farkli aglardaki (ozellikle mobil internet) cihazlarin goruntu baglantisi icin aktarma sunuculari.
+// Cloudflare anahtari varsa gecici kimlik bilgisi uretilir; yoksa TURN_URLS ile sabit sunucu kullanilir.
+const STUN = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+let iceCache = { at: 0, servers: null };
+
+async function iceServers() {
+  if (iceCache.servers && Date.now() - iceCache.at < 6 * 3600 * 1000) return iceCache.servers;
+  let extra = [];
+  if (process.env.CF_TURN_KEY_ID && process.env.CF_TURN_API_TOKEN) {
+    try {
+      const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${process.env.CF_TURN_KEY_ID}/credentials/generate-ice-servers`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.CF_TURN_API_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ttl: 86400 }),
+      });
+      if (r.ok) extra = (await r.json()).iceServers || [];
+      else console.error('TURN bilgisi alinamadi:', r.status);
+    } catch (e) {
+      console.error('TURN bilgisi alinamadi:', e.message);
+    }
+  } else if (process.env.TURN_URLS) {
+    extra = [{ urls: process.env.TURN_URLS.split(',').map((u) => u.trim()), username: process.env.TURN_USERNAME, credential: process.env.TURN_CREDENTIAL }];
+  }
+  iceCache = { at: Date.now(), servers: [...STUN, ...extra] };
+  return iceCache.servers;
+}
+
+app.get('/api/ice', auth, async (req, res) => res.json({ iceServers: await iceServers() }));
+
 app.post('/api/block/:name', auth, (req, res) => {
   const other = db.dmTarget(req.params.name);
   if (!other || other.id === req.user.id) return res.status(404).json({ error: 'nouser' });
@@ -295,6 +363,7 @@ io.on('connection', (socket) => {
     if (r.seats) r.seats[0] = { socketId: socket.id, userId: me.id, name: me.name, muted: false };
     rooms.set(r.id, r);
     joinRoom(socket, r);
+    for (const fid of db.followerIds(me.id)) emitToUser(fid, 'follow:live', { name: me.name, roomId: r.id, title: r.title, type: r.type });
     broadcastRooms();
     cb({ room: roomState(r) });
   });

@@ -68,6 +68,13 @@ db.exec(`
     blocked_id INTEGER NOT NULL,
     PRIMARY KEY (user_id, blocked_id)
   );
+  CREATE TABLE IF NOT EXISTS follows (
+    follower_id INTEGER NOT NULL,
+    followee_id INTEGER NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (follower_id, followee_id)
+  );
+  CREATE INDEX IF NOT EXISTS follows_followee ON follows (followee_id);
 `);
 
 // Sonradan eklenen sutunlar: eski veritabanlarina da eklenir.
@@ -83,6 +90,8 @@ addColumn('users', 'bot_active', 'INTEGER NOT NULL DEFAULT 1');
 addColumn('users', 'avatar', 'TEXT');
 addColumn('users', 'is_demo', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('users', 'demo_pass', 'TEXT');
+addColumn('users', 'bio', 'TEXT');
+addColumn('users', 'avatar_img', 'BLOB');
 
 // Bot ozelligi kaldirildi; onceki surumden kalan bot hesaplari silinir.
 db.exec('DELETE FROM users WHERE is_bot = 1');
@@ -206,6 +215,54 @@ export function listConversations(userId) {
     .all(userId, userId, userId, userId, userId)
     .map((c) => ({ name: c.name, text: c.text, at: c.at, mine: !!c.mine, unread: c.unread }));
 }
+
+// ---------- Profil ve takip ----------
+
+const userIdByName = (name) => (typeof name === 'string' ? q.userByName.get(name.trim()) : null);
+
+// Profil fotografi veritabaninda kucuk bir JPEG olarak durur; boylece yedekle birlikte korunur.
+export function setAvatar(userId, buf) {
+  const version = String(Date.now());
+  db.prepare('UPDATE users SET avatar_img = ?, avatar = ? WHERE id = ?').run(buf, version, userId);
+  return version;
+}
+
+export function getAvatar(name) {
+  const u = userIdByName(name);
+  if (!u || u.banned || !u.avatar_img) return null;
+  return { img: u.avatar_img, version: u.avatar };
+}
+
+export function setBio(userId, bio) {
+  db.prepare('UPDATE users SET bio = ? WHERE id = ?').run(String(bio || '').trim().slice(0, 150), userId);
+}
+
+export function getProfile(name, viewerId) {
+  const u = userIdByName(name);
+  if (!u || u.banned || u.is_bot) return null;
+  const one = (sql, ...a) => Object.values(db.prepare(sql).get(...a))[0];
+  return {
+    id: u.id,
+    name: u.name,
+    bio: u.bio || '',
+    joined: u.created_at,
+    avatar: u.avatar_img ? u.avatar : null,
+    followers: one('SELECT COUNT(*) FROM follows WHERE followee_id = ?', u.id),
+    following: one('SELECT COUNT(*) FROM follows WHERE follower_id = ?', u.id),
+    giftsReceived: one('SELECT COALESCE(SUM(coins), 0) FROM gifts WHERE to_id = ?', u.id),
+    isFollowing: !!db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND followee_id = ?').get(viewerId, u.id),
+  };
+}
+
+export function setFollow(followerId, followeeId, follow) {
+  if (follow) db.prepare('INSERT OR IGNORE INTO follows (follower_id, followee_id, at) VALUES (?, ?, ?)').run(followerId, followeeId, Date.now());
+  else db.prepare('DELETE FROM follows WHERE follower_id = ? AND followee_id = ?').run(followerId, followeeId);
+}
+
+export const followerIds = (userId) => db.prepare('SELECT follower_id AS id FROM follows WHERE followee_id = ?').all(userId).map((r) => r.id);
+
+export const followingNames = (userId) =>
+  db.prepare('SELECT u.name FROM follows f JOIN users u ON u.id = f.followee_id WHERE f.follower_id = ? AND u.banned = 0 ORDER BY u.name').all(userId).map((r) => r.name);
 
 export function getThread(userId, otherId) {
   return db
@@ -360,6 +417,7 @@ export function deleteUserData(id) {
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM dms WHERE from_id = ? OR to_id = ?').run(id, id);
     db.prepare('DELETE FROM blocks WHERE user_id = ? OR blocked_id = ?').run(id, id);
+    db.prepare('DELETE FROM follows WHERE follower_id = ? OR followee_id = ?').run(id, id);
     db.prepare('DELETE FROM reports WHERE from_id = ?').run(id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     db.exec('COMMIT');

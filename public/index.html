@@ -42,11 +42,12 @@
       <button class="icon-btn dm-btn" data-action="inbox" title="Mesajlar">💬<i class="dm-badge hidden"></i></button>
       <button class="pill coin" data-action="wallet"><span>🪙</span><b id="home-coins">0</b></button>
       <button class="lang-btn" type="button" data-action="lang"></button>
-      <button class="avatar-btn" data-action="wallet" id="home-avatar"></button>
+      <button class="avatar-btn" data-action="my-profile" id="home-avatar"></button>
     </div>
   </header>
   <nav class="tabs" id="home-tabs">
     <button data-tab="all" class="active" data-i18n="tab_all"></button>
+    <button data-tab="following" data-i18n="tab_following"></button>
     <button data-tab="video" data-i18n="tab_video"></button>
     <button data-tab="voice" data-i18n="tab_voice"></button>
     <button data-tab="chat" data-i18n="tab_chat"></button>
@@ -125,7 +126,7 @@
 
 <div class="sheet hidden" id="sheet-wallet">
   <div class="sheet-head"><h3 data-i18n="wallet"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
-  <div class="wallet-me"><div class="avatar" id="wallet-avatar"></div><b id="wallet-name"></b></div>
+  <div class="wallet-me"><div class="avatar" id="wallet-avatar"></div><b id="wallet-name"></b><button class="link" data-action="my-profile" data-i18n="my_profile"></button></div>
   <div class="balances">
     <div><small data-i18n="coins"></small><b>🪙 <span id="wallet-coins">0</span></b></div>
     <div><small data-i18n="diamonds"></small><b>💎 <span id="wallet-diamonds">0</span></b></div>
@@ -171,7 +172,7 @@
 </div>
 
 <div class="sheet hidden" id="sheet-user">
-  <div class="user-card"><span id="user-av"></span><b id="user-name"></b></div>
+  <div class="user-card"><span id="user-av"></span><b id="user-name"></b><p class="muted user-bio" id="user-bio"></p><div class="user-stats" id="user-stats"></div></div>
   <div class="user-actions" id="user-actions"></div>
 </div>
 
@@ -192,6 +193,7 @@
   <form class="dm-form" id="dm-form"><input id="dm-input" maxlength="500" autocomplete="off" data-i18n-ph="dm_send_ph"><button class="btn primary sm" data-i18n="send"></button></form>
 </div>
 
+<div class="live-alert hidden" id="live-alert"></div>
 <div class="toast hidden" id="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
