@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import * as db from './db.js';
 import * as push from './push.js';
+import { gameList, gameCategories } from './games.js';
 import { GIFTS, PACKS, HOST_SHARE, PK_SECONDS, VOICE_SEATS } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -79,6 +80,11 @@ app.post('/api/buy', auth, (req, res) => {
 });
 
 app.get('/api/rooms', (req, res) => res.json({ rooms: roomList() }));
+
+app.get('/api/games', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=600');
+  res.json({ games: await gameList(), cats: gameCategories });
+});
 
 // ---------- Ozel mesajlar ----------
 

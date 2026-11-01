@@ -48,16 +48,25 @@
   </header>
   <nav class="tabs" id="home-tabs">
     <button data-tab="all" class="active" data-i18n="tab_all"></button>
+    <button data-tab="games" data-i18n="tab_games"></button>
     <button data-tab="following" data-i18n="tab_following"></button>
     <button data-tab="video" data-i18n="tab_video"></button>
     <button data-tab="voice" data-i18n="tab_voice"></button>
     <button data-tab="chat" data-i18n="tab_chat"></button>
     <button data-tab="pk" data-i18n="tab_pk"></button>
   </nav>
+  <nav class="tabs small hidden" id="game-cats"></nav>
   <main class="grid" id="room-grid"></main>
   <p class="empty muted hidden" id="room-empty" data-i18n="empty"></p>
   <button class="fab" data-action="golive"><span class="dot"></span><span data-i18n="goLive"></span></button>
 </section>
+
+<!-- Oyun: tam ekran -->
+<div class="game-view hidden" id="game-view">
+  <div class="game-bar"><b id="game-title"></b><button class="icon-btn" data-action="close-game">✕</button></div>
+  <iframe id="game-frame" title="Oyun" allow="autoplay; fullscreen; gamepad" allowfullscreen
+    sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-pointer-lock"></iframe>
+</div>
 
 <!-- Canli oda -->
 <section id="view-room" class="view hidden">

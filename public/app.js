@@ -224,6 +224,8 @@ $('#packs').onclick = async (e) => {
 };
 
 function renderGrid() {
+  $('#game-cats').classList.toggle('hidden', state.tab !== 'games');
+  if (state.tab === 'games') return renderGames();
   const list = state.rooms.filter((r) =>
     state.tab === 'all' ? true : state.tab === 'pk' ? r.inPk : state.tab === 'following' ? state.following.has(r.hostName) : r.type === state.tab,
   );
@@ -250,6 +252,8 @@ $('#home-tabs').onclick = (e) => {
 };
 
 $('#room-grid').onclick = (e) => {
+  const g = e.target.closest('[data-game]');
+  if (g) return openGame(g.dataset.game, g.dataset.title);
   const c = e.target.closest('[data-room]');
   if (c) joinRoom(c.dataset.room);
 };
@@ -1184,6 +1188,9 @@ document.addEventListener('click', async (e) => {
     case 'daily':
       openDaily(false);
       break;
+    case 'close-game':
+      closeGame();
+      break;
     case 'push':
       if (state.pushOn) disablePush(true).then(() => toast(t('push_off')));
       else enablePush(false);
@@ -1258,6 +1265,66 @@ $('#delete-yes').onclick = async () => {
   await logout();
   $('#auth-error').textContent = t('err_deleted');
 };
+
+// ---------- Oyunlar ----------
+// GameDistribution oyunlari: liste sunucudan gelir, oyun tam ekran cercevede acilir.
+
+state.games = null;
+state.gameCat = 'all';
+
+async function renderGames() {
+  $('#room-empty').classList.add('hidden');
+  if (!state.games) {
+    $('#room-grid').innerHTML = `<p class="muted tiny">${esc(t('games_loading'))}</p>`;
+    try {
+      state.games = await api('/api/games');
+    } catch {
+      $('#room-grid').innerHTML = `<p class="muted tiny">${esc(t('err_net'))}</p>`;
+      return;
+    }
+    if (state.tab !== 'games') return;
+  }
+  const { games, cats } = state.games;
+  $('#game-cats').innerHTML = ['all', ...cats]
+    .map((c) => `<button data-cat="${esc(c)}" class="${c === state.gameCat ? 'active' : ''}">${esc(t(`gc_${c}`) || c)}</button>`)
+    .join('');
+  const list = state.gameCat === 'all' ? games : games.filter((g) => g.cat === state.gameCat);
+  $('#room-grid').innerHTML = list.length
+    ? list
+        .map(
+          (g) => `<button class="card game-card" data-game="${esc(g.id)}" data-title="${esc(g.title)}">
+        <img src="${esc(g.thumb)}" alt="" loading="lazy">
+        <div class="card-info"><b>${esc(g.title)}</b></div>
+      </button>`,
+        )
+        .join('')
+    : `<p class="muted tiny">${esc(t('games_empty'))}</p>`;
+}
+
+$('#game-cats').onclick = (e) => {
+  const b = e.target.closest('[data-cat]');
+  if (!b) return;
+  state.gameCat = b.dataset.cat;
+  renderGames();
+};
+
+function openGame(id, title) {
+  $('#game-title').textContent = title;
+  const ref = encodeURIComponent(`${location.origin}/oyun/${id}`);
+  $('#game-frame').src = `https://html5.gamedistribution.com/${encodeURIComponent(id)}/?gd_sdk_referrer_url=${ref}`;
+  $('#game-view').classList.remove('hidden');
+  // Telefonda geri tusu oyunu kapatsin.
+  history.pushState({ game: id }, '');
+}
+
+function closeGame(fromHistory) {
+  if ($('#game-view').classList.contains('hidden')) return;
+  $('#game-view').classList.add('hidden');
+  $('#game-frame').src = 'about:blank';
+  if (!fromHistory && history.state?.game) history.back();
+}
+
+window.addEventListener('popstate', () => closeGame(true));
 
 // ---------- Telefon bildirimleri ----------
 
