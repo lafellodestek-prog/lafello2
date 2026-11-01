@@ -18,3 +18,36 @@ self.addEventListener('fetch', (e) => {
   if (e.request.mode !== 'navigate') return;
   e.respondWith(fetch(e.request).catch(() => caches.match(OFFLINE)));
 });
+
+// Telefon bildirimi: uygulama kapaliyken sunucudan gelir.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try {
+    d = e.data.json();
+  } catch {}
+  e.waitUntil(
+    self.registration.showNotification(d.title || 'Lafello', {
+      body: d.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/favicon-48.png',
+      tag: d.tag,
+      data: { url: d.url || '/' },
+    }),
+  );
+});
+
+// Bildirime dokununca acik uygulama one gelir ve ilgili yere gider; acik degilse yeni pencere acilir.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const open = list.find((c) => new URL(c.url).origin === self.location.origin);
+      if (open) {
+        open.postMessage({ open: url });
+        return open.focus();
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import * as db from './db.js';
+import * as push from './push.js';
 import { GIFTS, PACKS, HOST_SHARE, PK_SECONDS, VOICE_SEATS } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,6 +105,29 @@ app.get('/api/dm/:name', auth, (req, res) => {
 });
 
 const lastDm = new Map();
+// ---------- Bildirimler ----------
+
+app.get('/api/push/key', (req, res) => res.json({ key: push.publicKey }));
+
+app.post('/api/push/subscribe', auth, (req, res) => {
+  const sub = req.body?.sub;
+  if (typeof sub?.endpoint !== 'string' || !sub.endpoint.startsWith('https://') || typeof sub.keys?.p256dh !== 'string' || typeof sub.keys?.auth !== 'string')
+    return res.status(400).json({ error: 'sub' });
+  db.addPushSub(req.user.id, sub, req.body?.lang);
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unsubscribe', auth, (req, res) => {
+  const mine = db.pushSubsFor(req.user.id).find((x) => x.endpoint === req.body?.endpoint);
+  if (mine) db.removePushSub(mine.endpoint);
+  res.json({ ok: true });
+});
+
+// Uygulamasi acik olmayan kullaniciya telefon bildirimi gider (acik olana uygulama icinde gosterilir).
+function notifyIfAway(userId, payload) {
+  if (!userSockets.get(userId)?.size) push.pushToUser(userId, payload);
+}
+
 app.post('/api/dm/:name', auth, (req, res) => {
   const other = db.dmTarget(req.params.name);
   const text = String(req.body?.text || '').trim().slice(0, 500);
@@ -115,6 +139,12 @@ app.post('/api/dm/:name', auth, (req, res) => {
   lastDm.set(req.user.id, Date.now());
   const m = db.sendDm(req.user.id, other.id, text);
   emitToUser(other.id, 'dm', { from: req.user.name, text: m.text, at: m.at, id: m.id });
+  notifyIfAway(other.id, {
+    tr: { title: `${req.user.name} sana mesaj gönderdi`, body: m.text.slice(0, 120) },
+    en: { title: `${req.user.name} sent you a message`, body: m.text.slice(0, 120) },
+    url: `/?dm=${encodeURIComponent(req.user.name)}`,
+    tag: `dm-${req.user.name}`,
+  });
   emitToUser(other.id, 'dm:unread', db.unreadTotal(other.id));
   emitToUser(req.user.id, 'dm:sent', { to: other.name, text: m.text, at: m.at, id: m.id });
   res.json({ message: { id: m.id, mine: true, text: m.text, at: m.at } });
@@ -399,7 +429,15 @@ io.on('connection', (socket) => {
     if (r.seats) r.seats[0] = { socketId: socket.id, userId: me.id, name: me.name, muted: false };
     rooms.set(r.id, r);
     joinRoom(socket, r);
-    for (const fid of db.followerIds(me.id)) emitToUser(fid, 'follow:live', { name: me.name, roomId: r.id, title: r.title, type: r.type });
+    for (const fid of db.followerIds(me.id)) {
+      emitToUser(fid, 'follow:live', { name: me.name, roomId: r.id, title: r.title, type: r.type });
+      notifyIfAway(fid, {
+        tr: { title: `${me.name} şu an canlıda!`, body: r.title },
+        en: { title: `${me.name} is live now!`, body: r.title },
+        url: `/?room=${r.id}`,
+        tag: `live-${me.id}`,
+      });
+    }
     broadcastRooms();
     cb({ room: roomState(r) });
   });
@@ -688,6 +726,20 @@ app.post('/api/admin/users/:id/coins', adminAuth, (req, res) => {
   if (!user) return res.status(404).json({ error: 'gone' });
   pushWallet(user);
   res.json({ user });
+});
+
+// ---------- Yoneticiden toplu bildirim ----------
+
+let lastBroadcast = 0;
+app.post('/api/admin/push', adminAuth, async (req, res) => {
+  const title = String(req.body?.title || '').trim().slice(0, 60);
+  const body = String(req.body?.body || '').trim().slice(0, 180);
+  if (!title || !body) return res.status(400).json({ error: 'text' });
+  if (Date.now() - lastBroadcast < 30000) return res.status(429).json({ error: 'wait' });
+  lastBroadcast = Date.now();
+  const text = { title, body };
+  const sent = await push.pushToAll({ tr: text, en: text, url: '/', tag: `admin-${Date.now()}` });
+  res.json({ sent });
 });
 
 // ---------- Deneme hesaplari ----------

@@ -56,3 +56,8 @@
 
 .demo-chat { margin-bottom: 12px; }
 .chip.green { background: rgba(22,163,107,.2); color: #2fd08f; }
+
+.push-note { margin-bottom: 10px; }
+.push-form { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.push-form textarea { width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); color: inherit; outline: none; resize: vertical; font: inherit; }
+.push-form textarea:focus { border-color: var(--pink); }

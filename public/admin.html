@@ -43,6 +43,7 @@
     <button data-tab="reports">Şikayetler <span class="count alert" id="c-reports"></span></button>
     <button data-tab="banned">Kapatılan hesaplar <span class="count" id="c-banned"></span></button>
     <button data-tab="demo">Deneme hesapları <span class="count" id="c-demo"></span></button>
+    <button data-tab="push">Bildirim gönder</button>
   </nav>
 
   <div id="tab-rooms" class="a-list"></div>
@@ -54,6 +55,15 @@
     <div class="a-list" id="a-reports"></div>
   </div>
   <div id="tab-banned" class="a-list hidden"></div>
+
+  <div id="tab-push" class="hidden">
+    <p class="muted tiny push-note">Bildirimleri açmış herkese telefon bildirimi gönderir. Şu an <b id="push-count">0</b> kişi bildirim alıyor.</p>
+    <form class="push-form" id="push-form">
+      <input id="push-title" maxlength="60" placeholder="Başlık (örn. Hafta sonu sürprizi 🎁)" required>
+      <textarea id="push-body" maxlength="180" rows="3" placeholder="Mesaj (en fazla 180 harf)" required></textarea>
+      <button class="btn primary" type="submit">Herkese gönder</button>
+    </form>
+  </div>
 
   <div id="tab-demo" class="hidden">
     <p class="muted tiny demo-note">Uygulamayı denemek için hazır hesaplar. Sen ya da arkadaşların bu hesaplarla farklı telefonlardan girip yayın açabilir, hediye gönderebilir, mesajlaşabilirsiniz. İstatistiklere ve sıralamalara sayılmazlar.</p>

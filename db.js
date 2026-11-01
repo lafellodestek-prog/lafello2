@@ -75,6 +75,15 @@ db.exec(`
     PRIMARY KEY (follower_id, followee_id)
   );
   CREATE INDEX IF NOT EXISTS follows_followee ON follows (followee_id);
+  CREATE TABLE IF NOT EXISTS push_subs (
+    endpoint TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    lang TEXT NOT NULL DEFAULT 'tr',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
 `);
 
 // Sonradan eklenen sutunlar: eski veritabanlarina da eklenir.
@@ -341,6 +350,7 @@ export function adminStats() {
     demoUsers: one('SELECT COUNT(*) FROM users WHERE is_demo = 1'),
     openReports: one("SELECT COUNT(*) FROM reports WHERE status = 'open'"),
     banned: one('SELECT COUNT(*) FROM users WHERE banned = 1'),
+    pushUsers: one('SELECT COUNT(DISTINCT p.user_id) FROM push_subs p JOIN users u ON u.id = p.user_id WHERE u.banned = 0'),
   };
 }
 
@@ -443,6 +453,7 @@ export function deleteUserData(id) {
     db.prepare('DELETE FROM dms WHERE from_id = ? OR to_id = ?').run(id, id);
     db.prepare('DELETE FROM blocks WHERE user_id = ? OR blocked_id = ?').run(id, id);
     db.prepare('DELETE FROM follows WHERE follower_id = ? OR followee_id = ?').run(id, id);
+    db.prepare('DELETE FROM push_subs WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM reports WHERE from_id = ?').run(id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     db.exec('COMMIT');
@@ -523,3 +534,22 @@ if (getSetting('xp_init') === null) {
                               + (SELECT COALESCE(SUM(coins), 0) FROM gifts WHERE to_id = users.id)`);
   setSetting('xp_init', '1');
 }
+
+// ---------- Bildirim abonelikleri ----------
+// Her cihaz/tarayici bir abonelik; ayni cihaza baska hesap girerse abonelik ona gecer.
+
+export function vapidKeys() {
+  const v = getSetting('vapid');
+  return v ? JSON.parse(v) : null;
+}
+export const saveVapidKeys = (k) => setSetting('vapid', JSON.stringify({ publicKey: k.publicKey, privateKey: k.privateKey }));
+
+export function addPushSub(userId, sub, lang) {
+  db.prepare(
+    `INSERT INTO push_subs (endpoint, user_id, p256dh, auth, lang, at) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, lang = excluded.lang`,
+  ).run(sub.endpoint, userId, sub.keys.p256dh, sub.keys.auth, lang === 'en' ? 'en' : 'tr', Date.now());
+}
+export const removePushSub = (endpoint) => db.prepare('DELETE FROM push_subs WHERE endpoint = ?').run(endpoint);
+export const pushSubsFor = (userId) => db.prepare('SELECT * FROM push_subs WHERE user_id = ?').all(userId);
+export const allPushSubs = () => db.prepare('SELECT p.* FROM push_subs p JOIN users u ON u.id = p.user_id WHERE u.banned = 0').all();

@@ -158,6 +158,7 @@ function render() {
   $('#c-rooms').textContent = rooms.length || '';
   $('#c-users').textContent = s.users || '';
   $('#c-demo').textContent = s.demoUsers || '';
+  $('#push-count').textContent = fmt(s.pushUsers || 0);
   $('#c-reports').textContent = s.openReports || '';
   $('#c-banned').textContent = banned.length || '';
 
@@ -214,9 +215,26 @@ $('#a-tabs').onclick = (e) => {
   if (!b) return;
   st.tab = b.dataset.tab;
   $$('#a-tabs button').forEach((x) => x.classList.toggle('active', x === b));
-  for (const t of ['rooms', 'users', 'reports', 'banned', 'demo']) $(`#tab-${t}`).classList.toggle('hidden', t !== st.tab);
+  for (const t of ['rooms', 'users', 'reports', 'banned', 'demo', 'push']) $(`#tab-${t}`).classList.toggle('hidden', t !== st.tab);
   if (st.tab === 'users') loadUsers();
   if (st.tab === 'demo') loadDemo();
+};
+
+// ---------- Bildirim gonder ----------
+
+$('#push-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const title = $('#push-title').value.trim();
+  const body = $('#push-body').value.trim();
+  if (!title || !body) return;
+  if (!(await confirmBox(`"${title}" bildirimi bildirim alan herkese gönderilsin mi?`, 'Gönder'))) return;
+  try {
+    const { sent } = await api('/api/admin/push', { title, body });
+    toast(`Bildirim ${fmt(sent)} cihaza gönderildi.`);
+    $('#push-form').reset();
+  } catch (err) {
+    toast(err.message === 'wait' ? 'Az önce gönderdin, 30 saniye bekle.' : 'Gönderilemedi, tekrar dene.');
+  }
 };
 
 // ---------- Deneme hesaplari ----------

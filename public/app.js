@@ -156,6 +156,7 @@ $('#auth-form').onsubmit = async (e) => {
 };
 
 async function logout() {
+  if (state.pushOn) await disablePush();
   await api('/api/logout', {}).catch(() => {});
   await leaveRoom(true);
   state.socket?.disconnect();
@@ -177,6 +178,12 @@ function enterApp(user) {
   // Goruntu baglantisi icin aktarma bilgisi ve takip edilenler arka planda yuklenir.
   api('/api/ice').then((r) => (state.ice = r.iceServers)).catch(() => {});
   setTimeout(() => openDaily(true), 800);
+  enablePush(true);
+  renderPushBtn();
+  if (location.search) {
+    openFromUrl(location.href);
+    history.replaceState(null, '', '/');
+  }
   api('/api/following')
     .then((r) => {
       state.following = new Set(r.names);
@@ -681,9 +688,7 @@ async function uploadPhoto(file) {
 // ---------- Takip edilenin canli bildirimi ----------
 
 function askNotifyPermission() {
-  try {
-    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-  } catch {}
+  if (!state.pushOn) enablePush(false);
 }
 
 function onFollowLive(n) {
@@ -1187,6 +1192,10 @@ document.addEventListener('click', async (e) => {
     case 'daily':
       openDaily(false);
       break;
+    case 'push':
+      if (state.pushOn) disablePush().then(() => toast(t('push_off')));
+      else enablePush(false);
+      break;
     case 'delete-account':
       $('#delete-pass').value = '';
       $('#delete-error').textContent = '';
@@ -1257,6 +1266,81 @@ $('#delete-yes').onclick = async () => {
   await logout();
   $('#auth-error').textContent = t('err_deleted');
 };
+
+// ---------- Telefon bildirimleri ----------
+
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+async function pushSubscription() {
+  if (!pushSupported()) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+
+function urlKey(b64) {
+  const s = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+
+// Izin ister, cihazi bu hesaba abone eder. quiet: izin zaten verildiyse sessizce yeniler.
+async function enablePush(quiet) {
+  if (!pushSupported()) {
+    if (!quiet) toast(t('push_unsupported'));
+    return false;
+  }
+  try {
+    if (quiet && Notification.permission !== 'granted') return false;
+    if ((await Notification.requestPermission()) !== 'granted') {
+      if (!quiet) toast(t('push_denied'));
+      return false;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const { key } = await api('/api/push/key');
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(key) });
+    }
+    await api('/api/push/subscribe', { sub: sub.toJSON(), lang: state.lang });
+    state.pushOn = true;
+    renderPushBtn();
+    if (!quiet) toast(t('push_ok'));
+    return true;
+  } catch {
+    if (!quiet) toast(t('err_net'));
+    return false;
+  }
+}
+
+async function disablePush() {
+  try {
+    const sub = await pushSubscription();
+    if (sub) {
+      await api('/api/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
+      await sub.unsubscribe();
+    }
+  } catch {}
+  state.pushOn = false;
+  renderPushBtn();
+}
+
+function renderPushBtn() {
+  const b = $('#push-btn');
+  b.classList.toggle('hidden', !pushSupported());
+  b.textContent = state.pushOn ? t('push_active') : t('push_enable');
+}
+
+// Bildirimden gelen adres: ?room=ID ya da ?dm=isim
+function openFromUrl(url) {
+  const p = new URL(url, location.href).searchParams;
+  if (p.get('room')) joinRoom(p.get('room'));
+  else if (p.get('dm')) openThread(p.get('dm'));
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.open && state.user) openFromUrl(e.data.open);
+  });
+}
 
 // ---------- Baslangic ----------
 
