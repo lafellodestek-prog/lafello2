@@ -319,3 +319,57 @@ input:focus { border-color: var(--pink); }
 
 /* Demo sohbet etiketi */
 .badge.demo, .msg .tag.demo { background: #5b6478; color: #fff; }
+
+/* ---------- Modern arka plan ----------
+   Yavasca suzulen renkli isik bulutlari, ince nokta deseni ve kenar karartmasi.
+   Bulanıklastirma yerine yumusak gecisler kullanilir; telefonlarda da akici calisir. */
+html { background: var(--bg); }
+body { background: transparent; isolation: isolate; }
+body::before,
+body::after { content: ''; position: fixed; pointer-events: none; z-index: -1; }
+body::before {
+  inset: -12%;
+  background:
+    radial-gradient(38% 34% at 24% 22%, rgba(139,61,255,.55), transparent 70%),
+    radial-gradient(34% 30% at 80% 30%, rgba(255,45,111,.40), transparent 70%),
+    radial-gradient(40% 34% at 60% 82%, rgba(47,139,255,.32), transparent 70%),
+    radial-gradient(28% 26% at 16% 76%, rgba(255,45,111,.26), transparent 70%);
+  animation: aurora 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+body::after {
+  inset: 0;
+  background:
+    radial-gradient(rgba(255,255,255,.09) 1px, transparent 1.5px) 0 0 / 24px 24px,
+    radial-gradient(130% 100% at 50% 10%, transparent 60%, rgba(5,3,10,.55) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000, rgba(0,0,0,.35));
+  mask-image: linear-gradient(to bottom, #000, rgba(0,0,0,.35));
+}
+@keyframes aurora {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate3d(4%, -3%, 0) rotate(8deg) scale(1.08); }
+  100% { transform: translate3d(-4%, 3%, 0) rotate(-6deg) scale(1.02); }
+}
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+
+#view-auth { background: none; }
+.auth-card { padding: 28px 22px; border-radius: 24px; background: rgba(23,18,31,.55); border: 1px solid rgba(255,255,255,.08);
+  -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+
+/* Ust cubuk ve alt pencereler cam gibi: arkadaki renkler hafifce gorunur */
+.topbar { background: rgba(13,10,20,.55); -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
+  margin: 0 -16px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.sheet { background: rgba(23,18,31,.82); -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
+  border-top-color: rgba(255,255,255,.1); }
+.sheet-backdrop { background: rgba(5,3,10,.45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.tabs button:not(.active) { background: rgba(255,255,255,.06); }
+.card { box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+
+/* Sesli ve yazili sohbet odalari da ayni isik bulutlarini kullanir */
+.room.voice, .room:has(.screens.split) {
+  background:
+    radial-gradient(60% 40% at 20% 0%, rgba(139,61,255,.55), transparent 70%),
+    radial-gradient(55% 40% at 90% 15%, rgba(255,45,111,.35), transparent 70%),
+    radial-gradient(70% 45% at 50% 100%, rgba(47,139,255,.25), transparent 70%),
+    #0d0a14;
+}
