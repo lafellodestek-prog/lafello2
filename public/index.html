@@ -55,6 +55,15 @@
     <button data-tab="chat" data-i18n="tab_chat"></button>
     <button data-tab="pk" data-i18n="tab_pk"></button>
   </nav>
+  <section class="mp-games hidden" id="mp-games">
+    <h4 data-i18n="mp_title"></h4>
+    <div class="mp-cards">
+      <button class="mp-card" data-mp-game="xox"><span>❌⭕</span><b data-i18n="mp_xox"></b></button>
+      <button class="mp-card" data-mp-game="c4"><span>🔴🟡</span><b data-i18n="mp_c4"></b></button>
+      <button class="mp-card" data-mp-game="rps"><span>✊✋✌️</span><b data-i18n="mp_rps"></b></button>
+    </div>
+    <h4 data-i18n="mp_more"></h4>
+  </section>
   <nav class="tabs small hidden" id="game-cats"></nav>
   <main class="grid" id="room-grid"></main>
   <p class="empty muted hidden" id="room-empty" data-i18n="empty"></p>
@@ -218,6 +227,21 @@
   <p class="muted" id="daily-sub"></p>
   <div class="daily-days" id="daily-days"></div>
   <button class="btn primary" id="daily-claim"></button>
+</div>
+
+<div class="sheet hidden" id="sheet-mp">
+  <div class="sheet-head"><h3 id="mp-sheet-title"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
+  <div class="mp-sheet" id="mp-sheet-body"></div>
+</div>
+
+<div class="live-alert mp-invite hidden" id="mp-invite"></div>
+
+<div class="mp-view hidden" id="mp-view">
+  <div class="game-bar"><b id="mp-head"></b><button class="icon-btn" data-action="mp-quit">✕</button></div>
+  <div class="mp-players" id="mp-players"></div>
+  <p class="mp-status" id="mp-status"></p>
+  <div class="mp-board" id="mp-board"></div>
+  <div class="mp-end hidden" id="mp-end"></div>
 </div>
 
 <div class="live-alert hidden" id="live-alert"></div>

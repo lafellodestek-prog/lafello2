@@ -576,3 +576,9 @@ export function addFcmToken(userId, token, lang) {
 export const removeFcmToken = (token) => db.prepare('DELETE FROM fcm_tokens WHERE token = ?').run(token);
 export const fcmTokensFor = (userId) => db.prepare('SELECT * FROM fcm_tokens WHERE user_id = ?').all(userId);
 export const allFcmTokens = () => db.prepare('SELECT f.* FROM fcm_tokens f JOIN users u ON u.id = f.user_id WHERE u.banned = 0').all();
+
+// Oyun odulu gibi hediye disi XP eklemeleri.
+export function addXp(userId, amount) {
+  q.addXp.run(amount, userId);
+  return getUser(userId);
+}

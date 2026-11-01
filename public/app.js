@@ -225,6 +225,7 @@ $('#packs').onclick = async (e) => {
 
 function renderGrid() {
   $('#game-cats').classList.toggle('hidden', state.tab !== 'games');
+  $('#mp-games').classList.toggle('hidden', state.tab !== 'games');
   if (state.tab === 'games') return renderGames();
   const list = state.rooms.filter((r) =>
     state.tab === 'all' ? true : state.tab === 'pk' ? r.inPk : state.tab === 'following' ? state.following.has(r.hostName) : r.type === state.tab,
@@ -286,6 +287,7 @@ function connectSocket() {
   socket.on('chat', addChat);
   socket.on('dm', onDm);
   socket.on('follow:live', onFollowLive);
+  mpSocket(socket);
   socket.on('dm:sent', onDmSent);
   socket.on('dm:unread', setUnread);
   socket.on('gift', onGift);
@@ -627,6 +629,7 @@ function renderProfile() {
   } else {
     btns.push(`<button class="btn ${p.isFollowing ? 'ghost' : 'primary'}" data-user-act="follow">${esc(t(p.isFollowing ? 'unfollow' : 'follow'))}</button>`);
     btns.push(`<button class="btn ghost" data-user-act="dm">${esc(t('dm_send'))}</button>`);
+    btns.push(`<button class="btn ghost" data-user-act="play">🎮 ${esc(t('mp_play_with'))}</button>`);
     if (state.isHost && state.room) btns.push(`<button class="btn ghost" data-user-act="kick">${esc(t('kick'))}</button>`);
   }
   $('#user-actions').innerHTML = btns.join('');
@@ -639,6 +642,7 @@ $('#user-actions').onclick = async (e) => {
   const act = e.target.closest('[data-user-act]')?.dataset.userAct;
   const { name } = $('#user-actions').dataset;
   if (act === 'dm') openThread(name);
+  if (act === 'play') openMpSheet({ target: name });
   if (act === 'watch') {
     closeSheets();
     joinRoom(state.profile.live.id);
@@ -1191,6 +1195,9 @@ document.addEventListener('click', async (e) => {
     case 'close-game':
       closeGame();
       break;
+    case 'mp-quit':
+      quitMp();
+      break;
     case 'push':
       if (state.pushOn) disablePush(true).then(() => toast(t('push_off')));
       else enablePush(false);
@@ -1325,6 +1332,227 @@ function closeGame(fromHistory) {
 }
 
 window.addEventListener('popstate', () => closeGame(true));
+
+// ---------- Cok oyunculu oyunlar ----------
+// XOX, Dort Bagla ve Tas-Kagit-Makas: rastgele rakip ya da davetle, hamleler sunucuda dogrulanir.
+
+const MP_ICONS = { r: '✊', p: '✋', s: '✌️' };
+state.mp = null; // aktif mac
+state.mpWait = null; // rakip aranan oyun
+
+const mpName = (game) => t(`mp_${game}`);
+
+function openMpSheet(opts) {
+  state.mpSheet = opts;
+  renderMpSheet();
+  openSheet('mp');
+}
+
+function renderMpSheet() {
+  const o = state.mpSheet || {};
+  const body = $('#mp-sheet-body');
+  if (o.target) {
+    $('#mp-sheet-title').textContent = t('mp_invite_q', { name: o.target });
+    body.innerHTML = ['xox', 'c4', 'rps']
+      .map((g) => `<button class="btn ghost" data-mp-invite="${g}" data-name="${esc(o.target)}">${esc(mpName(g))}</button>`)
+      .join('');
+    return;
+  }
+  $('#mp-sheet-title').textContent = mpName(o.game);
+  if (state.mpWait === o.game) {
+    body.innerHTML = `<p class="mp-wait"><span class="spinner"></span>${esc(t('mp_searching'))}</p>
+      <button class="btn ghost" data-mp-cancel>${esc(t('cancel'))}</button>`;
+    return;
+  }
+  const friends = [...state.following].slice(0, 12);
+  body.innerHTML = `<button class="btn primary" data-mp-queue="${o.game}">🎲 ${esc(t('mp_random'))}</button>
+    <p class="muted tiny">${esc(t('mp_or_invite'))}</p>
+    <form class="mp-invite-form" data-game="${o.game}"><input name="who" maxlength="20" placeholder="${esc(t('mp_name_ph'))}" autocomplete="off"><button class="btn ghost" type="submit">${esc(t('mp_invite_btn'))}</button></form>
+    ${friends.length ? `<div class="mp-friends">${friends.map((n) => `<button data-mp-invite="${o.game}" data-name="${esc(n)}">${avatarHtml(n)}<span>${esc(n)}</span></button>`).join('')}</div>` : ''}`;
+}
+
+function mpInvite(game, name) {
+  state.socket.emit('mp:invite', { game, name }, (r) => {
+    if (r?.ok) {
+      closeSheets();
+      toast(t('mp_invite_sent', { name }));
+    } else toast(t(`mp_err_${r?.error}`) || t('err_net'));
+  });
+}
+
+$('#mp-games').onclick = (e) => {
+  const c = e.target.closest('[data-mp-game]');
+  if (c) openMpSheet({ game: c.dataset.mpGame });
+};
+
+$('#sheet-mp').addEventListener('click', (e) => {
+  const q = e.target.closest('[data-mp-queue]');
+  const inv = e.target.closest('[data-mp-invite]');
+  if (e.target.closest('[data-mp-cancel]')) {
+    state.socket.emit('mp:cancel');
+    state.mpWait = null;
+    renderMpSheet();
+  }
+  if (inv) mpInvite(inv.dataset.mpInvite, inv.dataset.name);
+  if (q)
+    state.socket.emit('mp:queue', { game: q.dataset.mpQueue }, (r) => {
+      if (r?.waiting) {
+        state.mpWait = q.dataset.mpQueue;
+        renderMpSheet();
+      } else if (r?.error) toast(t(`mp_err_${r.error}`) || t('err_net'));
+    });
+});
+
+$('#sheet-mp').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = e.target.closest('.mp-invite-form');
+  const name = f?.who.value.trim();
+  if (name) mpInvite(f.dataset.game, name);
+});
+
+function onMpInvited(inv) {
+  const box = $('#mp-invite');
+  box.innerHTML = `${avatarHtml(inv.from)}<div><b>${esc(t('mp_invited', { name: inv.from }))}</b><small>${esc(mpName(inv.game))}</small></div>
+    <button class="btn ghost sm" data-mp-answer="0">${esc(t('mp_no'))}</button><button class="btn primary sm" data-mp-answer="1">${esc(t('mp_yes'))}</button>`;
+  box.dataset.id = inv.id;
+  box.classList.remove('hidden');
+  clearTimeout(state.mpInviteTimer);
+  state.mpInviteTimer = setTimeout(() => box.classList.add('hidden'), 30000);
+}
+
+$('#mp-invite').onclick = (e) => {
+  const b = e.target.closest('[data-mp-answer]');
+  if (!b) return;
+  const box = $('#mp-invite');
+  box.classList.add('hidden');
+  state.socket.emit('mp:answer', { id: box.dataset.id, accept: b.dataset.mpAnswer === '1' }, (r) => {
+    if (r?.error) toast(t(r.error === 'busy' ? 'mp_err_busy' : 'mp_err_gone'));
+  });
+};
+
+function onMpState(m) {
+  const first = !state.mp || state.mp.id !== m.id;
+  state.mp = m;
+  state.mpWait = null;
+  if (first) {
+    closeSheets();
+    $('#mp-view').classList.remove('hidden');
+    if (!history.state?.mp) history.pushState({ mp: m.id }, '');
+  }
+  state.mpDeadline = Date.now() + (m.left || 0);
+  renderMp();
+}
+
+function renderMp() {
+  const m = state.mp;
+  if (!m) return;
+  const me = m.you;
+  const other = m.players[1 - me];
+  const s = m.state;
+  const marks = m.game === 'xox' ? ['❌', '⭕'] : m.game === 'c4' ? ['🔴', '🟡'] : ['', ''];
+  $('#mp-head').textContent = mpName(m.game);
+  $('#mp-players').innerHTML = [me, 1 - me]
+    .map((i) => {
+      const active = !m.over && m.game !== 'rps' && m.turn === i;
+      const score = m.game === 'rps' ? `<i>${s.score[i]}</i>` : `<i>${marks[i]}</i>`;
+      return `<div class="mp-p ${active ? 'active' : ''}">${avatarHtml(m.players[i])}<b>${esc(i === me ? t('mp_you') : m.players[i])}</b>${score}</div>`;
+    })
+    .join('<span class="mp-vs">VS</span>');
+
+  // Durum satiri
+  let status = '';
+  if (m.over) status = m.over.winner === null ? t('mp_draw') : m.over.winner === me ? t('mp_won') : t('mp_lost');
+  else if (m.game === 'rps') status = s.picks[me] ? t('mp_wait_pick', { name: other }) : t('mp_pick', { n: s.round });
+  else status = m.turn === me ? t('mp_your_turn') : t('mp_their_turn', { name: other });
+  $('#mp-status').innerHTML = `${esc(status)}${m.over ? '' : ` <span class="mp-timer" id="mp-timer"></span>`}`;
+  $('#mp-status').className = `mp-status ${m.over ? (m.over.winner === me ? 'won' : m.over.winner === null ? '' : 'lost') : ''}`;
+
+  // Tahta
+  const board = $('#mp-board');
+  board.className = `mp-board ${m.game}`;
+  if (m.game === 'xox') {
+    board.innerHTML = s.board
+      .map((c, i) => `<button data-cell="${i}" class="${s.line?.includes(i) ? 'win' : ''}" ${c !== null || m.over || m.turn !== me ? 'disabled' : ''}>${c === null ? '' : marks[c]}</button>`)
+      .join('');
+  } else if (m.game === 'c4') {
+    board.innerHTML = s.board
+      .map((c, i) => `<button data-col="${i % 7}" class="${c === null ? '' : `p${c}`} ${s.line?.includes(i) ? 'win' : ''} ${s.lastCell === i ? 'last' : ''}" ${m.over || m.turn !== me ? 'disabled' : ''}></button>`)
+      .join('');
+  } else {
+    const last = s.last
+      ? `<div class="rps-last"><span>${MP_ICONS[s.last.picks[me]]}</span><small>${esc(s.last.winner === null ? t('mp_round_draw') : s.last.winner === me ? t('mp_round_won') : t('mp_round_lost'))}</small><span>${MP_ICONS[s.last.picks[1 - me]]}</span></div>`
+      : '';
+    board.innerHTML = `${last}<div class="rps-picks">${['r', 'p', 's']
+      .map((p) => `<button data-pick="${p}" class="${s.picks[me] === p ? 'chosen' : ''}" ${s.picks[me] || m.over ? 'disabled' : ''}>${MP_ICONS[p]}</button>`)
+      .join('')}</div>${s.picks[1 - me] === '?' && !m.over ? `<p class="muted tiny">${esc(t('mp_they_picked', { name: other }))}</p>` : ''}`;
+  }
+
+  // Bitis
+  const end = $('#mp-end');
+  end.classList.toggle('hidden', !m.over);
+  if (m.over) {
+    const xp = m.over.winner === null ? 5 : m.over.winner === me ? 20 : 0;
+    const left = m.over.reason === 'left' || m.oppLeft;
+    const why = [m.over.reason === 'timeout' ? t('mp_timeout') : '', left ? t('mp_opp_left') : ''].filter(Boolean).join(' ');
+    end.innerHTML = `${why ? `<p class="muted tiny">${esc(why)}</p>` : ''}${xp ? `<p class="mp-xp">+${xp} XP</p>` : ''}
+      <button class="btn primary" data-mp-again ${left ? 'disabled' : ''}>${esc(t('mp_again'))}</button>
+      <button class="btn ghost" data-action="mp-quit">${esc(t('mp_exit'))}</button>`;
+  }
+}
+
+// Sira suresi geri sayimi
+setInterval(() => {
+  const el = $('#mp-timer');
+  if (!el || !state.mp || state.mp.over) return;
+  const sec = Math.max(0, Math.ceil((state.mpDeadline - Date.now()) / 1000));
+  el.textContent = `⏱ ${sec}`;
+  el.classList.toggle('low', sec <= 5);
+}, 250);
+
+$('#mp-board').onclick = (e) => {
+  const b = e.target.closest('button:not([disabled])');
+  if (!b || !state.mp) return;
+  if (b.dataset.cell) state.socket.emit('mp:move', { move: Number(b.dataset.cell) });
+  if (b.dataset.col) state.socket.emit('mp:move', { move: Number(b.dataset.col) });
+  if (b.dataset.pick) state.socket.emit('mp:move', { move: b.dataset.pick });
+};
+
+$('#mp-end').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mp-again]');
+  if (!b) return;
+  state.socket.emit('mp:again');
+  b.disabled = true;
+  b.textContent = t('mp_again_wait');
+});
+
+async function quitMp(fromHistory) {
+  if (!state.mp) return;
+  if (!state.mp.over && !(await confirmBox(t('mp_quit_q'), t('mp_exit')))) {
+    if (fromHistory) history.pushState({ mp: state.mp.id }, '');
+    return;
+  }
+  state.socket.emit('mp:leave');
+  state.mp = null;
+  $('#mp-view').classList.add('hidden');
+  if (!fromHistory && history.state?.mp) history.back();
+}
+
+window.addEventListener('popstate', () => {
+  if (state.mp && !$('#mp-view').classList.contains('hidden')) quitMp(true);
+});
+
+function mpSocket(socket) {
+  socket.on('mp:state', onMpState);
+  socket.on('mp:invited', onMpInvited);
+  socket.on('mp:declined', ({ name }) => toast(t('mp_declined', { name })));
+  socket.on('mp:again', ({ name }) => toast(t('mp_again_asked', { name })));
+  socket.on('mp:left', () => {
+    if (state.mp?.over) {
+      state.mp.oppLeft = true;
+      renderMp();
+    }
+  });
+}
 
 // ---------- Telefon bildirimleri ----------
 

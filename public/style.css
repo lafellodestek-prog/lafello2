@@ -380,7 +380,60 @@ body::after {
 .game-card { aspect-ratio: 4 / 3; background: var(--card); }
 .game-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .game-card .card-info b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.game-view { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; }
+.game-view { position: fixed; inset: 0; z-index: 19; background: #000; display: flex; flex-direction: column; }
 .game-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top)); background: var(--bg-2); }
 .game-bar b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .game-view iframe { flex: 1; width: 100%; border: 0; background: #000; }
+
+/* Cok oyunculu oyunlar */
+.mp-games h4 { font-size: 14px; color: var(--muted); margin: 4px 0 8px; }
+.mp-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.mp-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px; border-radius: 16px; text-align: center;
+  background: linear-gradient(160deg, rgba(139,61,255,.35), rgba(255,45,111,.22)); border: 1px solid rgba(255,255,255,.1); }
+.mp-card span { font-size: 24px; letter-spacing: -2px; }
+.mp-card b { font-size: 13px; }
+.mp-sheet { display: flex; flex-direction: column; gap: 10px; }
+.mp-invite-form { display: flex; gap: 8px; }
+.mp-invite-form input { flex: 1; }
+.mp-friends { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.mp-friends button { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); min-width: 56px; }
+.mp-wait { display: flex; align-items: center; gap: 10px; justify-content: center; padding: 14px; }
+.spinner { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--pink); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.mp-invite { border-color: var(--purple); }
+.mp-invite .btn.sm { padding: 8px 12px; }
+.mp-view { position: fixed; inset: 0; z-index: 19; display: flex; flex-direction: column; align-items: center; gap: 14px; overflow-y: auto; padding-bottom: 24px;
+  background: radial-gradient(60% 40% at 20% 0%, rgba(139,61,255,.45), transparent 70%), radial-gradient(60% 40% at 90% 100%, rgba(255,45,111,.3), transparent 70%), var(--bg); }
+.mp-view .game-bar { width: 100%; }
+.mp-players { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.mp-p { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; border-radius: 16px; border: 2px solid transparent; min-width: 100px; }
+.mp-p.active { border-color: var(--pink); background: rgba(255,45,111,.1); }
+.mp-p b { font-size: 14px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-p i { font-style: normal; font-size: 20px; font-weight: 900; }
+.mp-vs { font-weight: 900; color: var(--muted); }
+.mp-status { font-weight: 700; font-size: 17px; text-align: center; padding: 0 16px; }
+.mp-status.won { color: var(--gold); font-size: 22px; }
+.mp-status.lost { color: var(--muted); }
+.mp-timer { display: inline-block; margin-left: 6px; font-size: 14px; color: var(--muted); }
+.mp-timer.low { color: var(--pink); }
+.mp-board.xox { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(84vw, 330px); }
+.mp-board.xox button { aspect-ratio: 1; border-radius: 16px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); font-size: 44px; }
+.mp-board.xox button.win { background: rgba(255,197,61,.3); }
+.mp-board.c4 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; width: min(92vw, 380px); padding: 8px; border-radius: 16px; background: #2f3fd0; }
+.mp-board.c4 button { aspect-ratio: 1; border-radius: 50%; background: var(--bg); }
+.mp-board.c4 button.p0 { background: #ff3b5c; }
+.mp-board.c4 button.p1 { background: #ffd23d; }
+.mp-board.c4 button.last { box-shadow: 0 0 0 3px rgba(255,255,255,.6); }
+.mp-board.c4 button.win { box-shadow: 0 0 0 4px #fff; }
+.mp-board.rps { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.rps-picks { display: flex; gap: 12px; }
+.rps-picks button { width: 84px; height: 84px; border-radius: 50%; font-size: 40px; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.12); }
+.rps-picks button.chosen { border-color: var(--pink); background: rgba(255,45,111,.2); }
+.rps-picks button:disabled:not(.chosen) { opacity: .4; }
+.rps-last { display: flex; align-items: center; gap: 16px; font-size: 40px; }
+.rps-last small { font-size: 13px; color: var(--muted); }
+.mp-board button:disabled { cursor: default; }
+.mp-end { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(84vw, 330px); }
+.mp-end .btn { width: 100%; }
+.mp-xp { color: var(--gold); font-weight: 900; font-size: 18px; }
+.mp-board.xox button:disabled, .mp-board.c4 button:disabled { opacity: 1; }

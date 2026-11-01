@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import * as db from './db.js';
 import * as push from './push.js';
 import { gameList, gameCategories } from './games.js';
+import { attachArena, arenaSocket, arenaDisconnect } from './arena.js';
 import { GIFTS, PACKS, HOST_SHARE, PK_SECONDS, VOICE_SEATS } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -410,6 +411,8 @@ function joinRoom(socket, r) {
   r.members.add(socket.id);
 }
 
+attachArena({ io, db, userSockets, pushWallet });
+
 io.use((socket, next) => {
   const user = db.userByToken(socket.handshake.auth?.token);
   if (!user) return next(new Error('auth'));
@@ -479,6 +482,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('room:leave', () => leaveRoom(socket));
+  arenaSocket(socket);
   socket.on('presence', ({ away } = {}) => (socket.data.away = !!away));
 
   let lastChat = 0;
@@ -612,6 +616,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    arenaDisconnect(socket);
     leaveRoom(socket);
     io.emit('peer:left', { socketId: socket.id });
     const set = userSockets.get(me.id);
