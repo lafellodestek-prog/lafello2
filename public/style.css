@@ -285,3 +285,34 @@ input:focus { border-color: var(--pink); }
 .live-alert { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 45; width: calc(100% - 32px); max-width: 440px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: rgba(30,23,41,.97); border: 1px solid var(--pink); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
 .live-alert div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .live-alert small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Seviye rozeti */
+.lv { display: inline-grid; place-items: center; min-width: 22px; height: 16px; padding: 0 4px; margin-right: 5px; border-radius: 6px; font-size: 10px; font-weight: 900; color: #fff; vertical-align: 1px; }
+.lv-1 { background: #3b6fd8; }
+.lv-2 { background: #16a36b; }
+.lv-3 { background: #8b3dff; }
+.lv-4 { background: linear-gradient(135deg, #ffc53d, #ff8a00); color: #3a2400; }
+.lv-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.lv-row small { color: var(--muted); margin-left: auto; font-size: 12px; }
+.lv-track { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.lv-fill { height: 100%; background: var(--grad); }
+.user-level, .wallet-level { width: 100%; max-width: 320px; margin-top: 6px; }
+/* Siralama */
+.seg { display: flex; gap: 6px; background: var(--card); padding: 4px; border-radius: 999px; }
+.seg button { flex: 1; padding: 8px; border-radius: 999px; font-weight: 700; color: var(--muted); }
+.seg button.active { background: var(--text); color: var(--bg); }
+.seg.small button { padding: 6px; font-size: 13px; }
+.lb-list { display: flex; flex-direction: column; gap: 4px; }
+.lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; text-align: left; }
+.lb-row:hover { background: var(--card); }
+.lb-row.top1 { background: rgba(255,197,61,.12); }
+.lb-rank { width: 26px; text-align: center; font-weight: 800; color: var(--muted); }
+.lb-name { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-coins { color: var(--gold); font-weight: 800; font-size: 14px; }
+/* Gunluk odul */
+.daily-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.daily-days .day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 12px; background: var(--card); border: 2px solid transparent; font-size: 12px; }
+.daily-days .day small { color: var(--muted); font-size: 10px; }
+.daily-days .day span { font-weight: 800; color: var(--gold); }
+.daily-days .day.today { border-color: var(--pink); background: rgba(255,45,111,.12); }
+.daily-days .day.done { opacity: .45; }

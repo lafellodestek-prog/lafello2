@@ -133,7 +133,19 @@ app.get('/api/u/:name', auth, (req, res) => {
   const p = db.getProfile(req.params.name, req.user.id);
   if (!p) return res.status(404).json({ error: 'nouser' });
   const live = [...rooms.values()].find((r) => r.hostId === p.id);
-  res.json({ profile: { ...p, id: undefined, me: p.id === req.user.id, live: live ? { id: live.id, title: live.title, type: live.type } : null } });
+  const u = db.getUser(p.id);
+  res.json({
+    profile: {
+      ...p,
+      id: undefined,
+      me: p.id === req.user.id,
+      live: live ? { id: live.id, title: live.title, type: live.type } : null,
+      level: u.level,
+      xp: u.xp,
+      levelFrom: u.levelFrom,
+      levelTo: u.levelTo,
+    },
+  });
 });
 
 app.post('/api/u/:name/follow', auth, (req, res) => {
@@ -141,6 +153,19 @@ app.post('/api/u/:name/follow', auth, (req, res) => {
   if (!p || p.id === req.user.id) return res.status(400).json({ error: 'nouser' });
   db.setFollow(req.user.id, p.id, req.body?.follow !== false);
   res.json({ profile: { ...db.getProfile(req.params.name, req.user.id), id: undefined } });
+});
+
+app.get('/api/leaderboard', auth, (req, res) => {
+  res.json(db.leaderboard(req.query.period === 'week' ? 'week' : 'day'));
+});
+
+app.get('/api/daily', auth, (req, res) => res.json(db.dailyStatus(req.user.id)));
+
+app.post('/api/daily/claim', auth, (req, res) => {
+  const r = db.claimDaily(req.user.id);
+  if (!r) return res.status(400).json({ error: 'claimed' });
+  pushWallet(r.user);
+  res.json(r);
 });
 
 app.get('/api/following', auth, (req, res) => res.json({ names: db.followingNames(req.user.id) }));
@@ -397,7 +422,7 @@ io.on('connection', (socket) => {
     const clean = String(text || '').trim().slice(0, 200);
     if (!r || !clean || Date.now() - lastChat < 400) return;
     lastChat = Date.now();
-    io.to(rk(r.id)).emit('chat', { name: me.name, text: clean, host: r.hostId === me.id });
+    io.to(rk(r.id)).emit('chat', { name: me.name, text: clean, host: r.hostId === me.id, level: db.getUser(me.id)?.level });
   });
 
   socket.on('gift', ({ giftId, targetRoomId, seat } = {}, cb) => {

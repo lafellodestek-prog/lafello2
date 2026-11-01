@@ -39,6 +39,7 @@
   <header class="topbar">
     <div class="logo"><span class="dot"></span>Lafello</div>
     <div class="topbar-right">
+      <button class="icon-btn dm-btn" data-action="leaderboard" title="Sıralama">🏆</button>
       <button class="icon-btn dm-btn" data-action="inbox" title="Mesajlar">💬<i class="dm-badge hidden"></i></button>
       <button class="pill coin" data-action="wallet"><span>🪙</span><b id="home-coins">0</b></button>
       <button class="lang-btn" type="button" data-action="lang"></button>
@@ -127,6 +128,8 @@
 <div class="sheet hidden" id="sheet-wallet">
   <div class="sheet-head"><h3 data-i18n="wallet"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
   <div class="wallet-me"><div class="avatar" id="wallet-avatar"></div><b id="wallet-name"></b><button class="link" data-action="my-profile" data-i18n="my_profile"></button></div>
+  <div class="wallet-level" id="wallet-level"></div>
+  <button class="btn ghost" data-action="daily">🎁 <span data-i18n="daily_btn"></span></button>
   <div class="balances">
     <div><small data-i18n="coins"></small><b>🪙 <span id="wallet-coins">0</span></b></div>
     <div><small data-i18n="diamonds"></small><b>💎 <span id="wallet-diamonds">0</span></b></div>
@@ -172,7 +175,7 @@
 </div>
 
 <div class="sheet hidden" id="sheet-user">
-  <div class="user-card"><span id="user-av"></span><b id="user-name"></b><p class="muted user-bio" id="user-bio"></p><div class="user-stats" id="user-stats"></div></div>
+  <div class="user-card"><span id="user-av"></span><b id="user-name"></b><div class="user-level" id="user-level"></div><p class="muted user-bio" id="user-bio"></p><div class="user-stats" id="user-stats"></div></div>
   <div class="user-actions" id="user-actions"></div>
 </div>
 
@@ -191,6 +194,20 @@
   <div class="thread-msgs" id="thread-msgs"></div>
   <p class="tiny muted hidden" id="thread-blocked"></p>
   <form class="dm-form" id="dm-form"><input id="dm-input" maxlength="500" autocomplete="off" data-i18n-ph="dm_send_ph"><button class="btn primary sm" data-i18n="send"></button></form>
+</div>
+
+<div class="sheet hidden" id="sheet-leaderboard">
+  <div class="sheet-head"><h3 data-i18n="leaderboard"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
+  <div class="seg" id="lb-kind"><button data-kind="hosts" class="active" data-i18n="lb_hosts"></button><button data-kind="gifters" data-i18n="lb_gifters"></button></div>
+  <div class="seg small" id="lb-period"><button data-period="day" class="active" data-i18n="lb_day"></button><button data-period="week" data-i18n="lb_week"></button></div>
+  <div class="lb-list" id="lb-list"></div>
+</div>
+
+<div class="sheet hidden" id="sheet-daily">
+  <div class="sheet-head"><h3 data-i18n="daily_title"></h3><button class="icon-btn" data-action="close-sheet">✕</button></div>
+  <p class="muted" id="daily-sub"></p>
+  <div class="daily-days" id="daily-days"></div>
+  <button class="btn primary" id="daily-claim"></button>
 </div>
 
 <div class="live-alert hidden" id="live-alert"></div>

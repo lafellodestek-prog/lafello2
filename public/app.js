@@ -176,6 +176,7 @@ function enterApp(user) {
   show('home');
   // Goruntu baglantisi icin aktarma bilgisi ve takip edilenler arka planda yuklenir.
   api('/api/ice').then((r) => (state.ice = r.iceServers)).catch(() => {});
+  setTimeout(() => openDaily(true), 800);
   api('/api/following')
     .then((r) => {
       state.following = new Set(r.names);
@@ -192,6 +193,7 @@ function renderWallet() {
   $('#wallet-coins').textContent = fmt(u.coins);
   $('#wallet-diamonds').textContent = fmt(u.diamonds);
   $('#wallet-name').textContent = u.name;
+  $('#wallet-level').innerHTML = levelBar(u);
   avatar($('#home-avatar'), u.name);
   avatar($('#wallet-avatar'), u.name);
   $('#earnings-d').textContent = t('earnings_d', { p: Math.round(state.config.hostShare * 100) });
@@ -266,6 +268,7 @@ function connectSocket() {
     renderGrid();
   });
   socket.on('wallet', (user) => {
+    if (state.user && user.level > state.user.level) toast(t('level_up', { n: user.level }));
     state.user = user;
     renderWallet();
   });
@@ -563,7 +566,7 @@ function addChat(m) {
   el.className = 'msg' + (m.system ? ' system' : '') + (m.gift ? ' giftmsg' : '');
   if (m.system === 'joined') el.innerHTML = `<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(t('joined'))}`;
   else if (m.gift) el.innerHTML = `<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(t('sentGift', { gift: giftName(m.gift) }))} ${giftById(m.gift)?.emoji || ''}`;
-  else el.innerHTML = `${m.host ? `<span class="tag">${esc(t('host'))}</span>` : ''}<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(m.text)}`;
+  else el.innerHTML = `${m.host ? `<span class="tag">${esc(t('host'))}</span>` : ''}${levelBadge(m.level)}<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(m.text)}`;
   const box = $('#chat');
   box.appendChild(el);
   while (box.children.length > 60) box.firstChild.remove();
@@ -600,6 +603,7 @@ function renderProfile() {
   const p = state.profile;
   $('#user-av').innerHTML = avatarHtml(p.name, 'avatar big-av');
   $('#user-name').textContent = p.name;
+  $('#user-level').innerHTML = levelBar(p);
   $('#user-bio').textContent = p.bio || (p.me ? t('no_bio_me') : '');
   $('#user-stats').innerHTML = `<div><b>${fmt(p.followers)}</b><small>${esc(t('followers'))}</small></div><div><b>${fmt(p.following)}</b><small>${esc(t('following_n'))}</small></div><div><b>🪙 ${fmt(p.giftsReceived)}</b><small>${esc(t('gifts_received'))}</small></div>`;
   const btns = [];
@@ -704,6 +708,96 @@ $('#live-alert').onclick = (e) => {
   const b = e.target.closest('[data-live-room]');
   $('#live-alert').classList.add('hidden');
   if (b) joinRoom(b.dataset.liveRoom);
+};
+
+// ---------- Seviye ----------
+
+// Seviye rozeti: 1-9 mavi, 10-19 yesil, 20-29 mor, 30 ve ustu altin.
+function levelBadge(level) {
+  if (!level) return '';
+  const tier = level >= 30 ? 4 : level >= 20 ? 3 : level >= 10 ? 2 : 1;
+  return `<span class="lv lv-${tier}" title="${esc(t('level', { n: level }))}">${level}</span>`;
+}
+
+function levelBar(u) {
+  const span = Math.max(1, u.levelTo - u.levelFrom);
+  const pct = Math.min(100, Math.round(((u.xp - u.levelFrom) / span) * 100));
+  return `<div class="lv-row">${levelBadge(u.level)}<b>${esc(t('level', { n: u.level }))}</b><small>${esc(t('xp_next', { n: fmt(u.levelTo - u.xp), l: u.level + 1 }))}</small></div><div class="lv-track"><div class="lv-fill" style="width:${pct}%"></div></div>`;
+}
+
+// ---------- Siralama ----------
+
+state.lb = { kind: 'hosts', period: 'day' };
+
+async function openLeaderboard() {
+  openSheet('leaderboard');
+  $('#lb-list').innerHTML = `<p class="muted tiny">${esc(t('connecting'))}</p>`;
+  try {
+    const data = await api(`/api/leaderboard?period=${state.lb.period}`);
+    const list = data[state.lb.kind];
+    $('#lb-list').innerHTML = list.length
+      ? list
+          .map(
+            (r, i) => `<button class="lb-row ${i < 3 ? `top${i + 1}` : ''}" data-profile="${esc(r.name)}">
+          <span class="lb-rank">${i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</span>${avatarHtml(r.name)}
+          <span class="lb-name">${esc(r.name)} ${levelBadge(r.level)}</span><span class="lb-coins">🪙 ${fmt(r.coins)}</span></button>`,
+          )
+          .join('')
+      : `<p class="muted tiny">${esc(t('lb_empty'))}</p>`;
+  } catch {
+    $('#lb-list').innerHTML = `<p class="muted tiny">${esc(t('err_net'))}</p>`;
+  }
+}
+
+$('#sheet-leaderboard').addEventListener('click', (e) => {
+  const kind = e.target.closest('[data-kind]');
+  const period = e.target.closest('[data-period]');
+  const row = e.target.closest('[data-profile]');
+  if (kind) state.lb.kind = kind.dataset.kind;
+  if (period) state.lb.period = period.dataset.period;
+  if (kind || period) {
+    $$('#lb-kind button').forEach((b) => b.classList.toggle('active', b.dataset.kind === state.lb.kind));
+    $$('#lb-period button').forEach((b) => b.classList.toggle('active', b.dataset.period === state.lb.period));
+    openLeaderboard();
+  }
+  if (row) openProfile(row.dataset.profile);
+});
+
+// ---------- Gunluk odul ----------
+
+async function openDaily(onlyIfAvailable) {
+  let st;
+  try {
+    st = await api('/api/daily');
+  } catch {
+    return;
+  }
+  if (onlyIfAvailable && !st.available) return;
+  $('#daily-sub').textContent = t('daily_sub', { n: st.streak });
+  $('#daily-days').innerHTML = st.rewards
+    .map((r, i) => {
+      const cls = i + 1 < st.day || (!st.available && i + 1 === st.day) ? 'done' : i + 1 === st.day ? 'today' : '';
+      return `<div class="day ${cls}"><small>${esc(t('daily_day', { n: i + 1 }))}</small><b>🪙</b><span>${r}</span></div>`;
+    })
+    .join('');
+  const btn = $('#daily-claim');
+  btn.disabled = !st.available;
+  btn.textContent = st.available ? t('daily_claim', { n: st.reward }) : t('daily_done');
+  openSheet('daily');
+}
+
+$('#daily-claim').onclick = async () => {
+  $('#daily-claim').disabled = true;
+  try {
+    const { reward, user } = await api('/api/daily/claim', {});
+    state.user = user;
+    renderWallet();
+    closeSheets();
+    toast(t('daily_ok', { n: reward }));
+  } catch {
+    $('#daily-claim').disabled = false;
+    toast(t('err_net'));
+  }
 };
 
 // ---------- Ozel mesajlar ----------
@@ -1086,6 +1180,12 @@ document.addEventListener('click', async (e) => {
       break;
     case 'my-profile':
       openProfile(state.user.name);
+      break;
+    case 'leaderboard':
+      openLeaderboard();
+      break;
+    case 'daily':
+      openDaily(false);
       break;
     case 'delete-account':
       $('#delete-pass').value = '';

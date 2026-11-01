@@ -92,6 +92,9 @@ addColumn('users', 'is_demo', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('users', 'demo_pass', 'TEXT');
 addColumn('users', 'bio', 'TEXT');
 addColumn('users', 'avatar_img', 'BLOB');
+addColumn('users', 'xp', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('users', 'streak', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('users', 'last_claim', 'TEXT');
 
 // Bot ozelligi kaldirildi; onceki surumden kalan bot hesaplari silinir.
 db.exec('DELETE FROM users WHERE is_bot = 1');
@@ -106,6 +109,7 @@ const q = {
   spend: db.prepare('UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?'),
   addCoins: db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?'),
   addDiamonds: db.prepare('UPDATE users SET diamonds10 = diamonds10 + ? WHERE id = ?'),
+  addXp: db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?'),
   insertGift: db.prepare('INSERT INTO gifts (from_id, to_id, gift, coins, at) VALUES (?, ?, ?, ?, ?)'),
   insertPurchase: db.prepare('INSERT INTO purchases (user_id, pack, coins, at) VALUES (?, ?, ?, ?)'),
   insertReport: db.prepare('INSERT INTO reports (from_id, target_id, reason, at) VALUES (?, ?, ?, ?)'),
@@ -113,8 +117,23 @@ const q = {
 
 const hash = (pass, salt) => scryptSync(pass, salt, 64).toString('hex');
 
+// Seviye: gonderilen ve alinan hediye jetonlari XP olur. Seviye n icin 50 * (n-1)^2 XP gerekir.
+export const levelOf = (xp) => Math.min(99, Math.floor(Math.sqrt((xp || 0) / 50)) + 1);
+export const xpForLevel = (level) => 50 * (level - 1) ** 2;
+
 export function publicUser(u) {
-  return u && { id: u.id, name: u.name, coins: u.coins, diamonds: u.diamonds10 / 10 };
+  if (!u) return u;
+  const level = levelOf(u.xp);
+  return {
+    id: u.id,
+    name: u.name,
+    coins: u.coins,
+    diamonds: u.diamonds10 / 10,
+    xp: u.xp || 0,
+    level,
+    levelFrom: xpForLevel(level),
+    levelTo: xpForLevel(level + 1),
+  };
 }
 
 export function validateNew(name, pass) {
@@ -164,6 +183,8 @@ export function sendGift(fromId, toId, gift) {
     }
     q.addDiamonds.run(Math.round(gift.coins * HOST_SHARE * 10), toId);
     q.insertGift.run(fromId, toId, gift.id, gift.coins, Date.now());
+    q.addXp.run(gift.coins, fromId);
+    q.addXp.run(gift.coins, toId);
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -436,4 +457,65 @@ export const totalChanges = () => db.prepare('SELECT total_changes() AS n').get(
 export function snapshot(file) {
   rmSync(file, { force: true });
   db.prepare('VACUUM INTO ?').run(file);
+}
+
+// ---------- Siralama listeleri ----------
+// Turkiye saatine (UTC+3, yaz saati yok) gore bugunun ve bu haftanin (pazartesi) baslangici.
+const TR_OFFSET = 3 * 3600 * 1000;
+export const trDay = (ms = Date.now()) => new Date(ms + TR_OFFSET).toISOString().slice(0, 10);
+
+export function periodStart(period) {
+  const dayStart = Date.parse(`${trDay()}T00:00:00+03:00`);
+  if (period !== 'week') return dayStart;
+  const weekday = (new Date(Date.now() + TR_OFFSET).getUTCDay() + 6) % 7; // pazartesi = 0
+  return dayStart - weekday * 86400000;
+}
+
+// En cok hediye alan yayincilar ve en cok hediye gonderen destekciler (deneme hesaplari haric).
+export function leaderboard(period) {
+  const since = periodStart(period);
+  const top = (col) =>
+    db
+      .prepare(
+        `SELECT u.name, u.xp, SUM(g.coins) AS coins FROM gifts g JOIN users u ON u.id = g.${col}
+         WHERE g.at >= ? AND u.is_demo = 0 AND u.banned = 0 GROUP BY u.id ORDER BY coins DESC LIMIT 20`,
+      )
+      .all(since)
+      .map((r) => ({ name: r.name, coins: r.coins, level: levelOf(r.xp) }));
+  return { hosts: top('to_id'), gifters: top('from_id') };
+}
+
+// ---------- Gunluk giris odulu ----------
+// Her gun bir kez alinir; ust uste gelen gunlerde odul artar, 7. gunden sonra basa doner.
+export const DAILY_REWARDS = [10, 15, 20, 25, 30, 40, 60];
+
+export function dailyStatus(userId) {
+  const u = q.userById.get(userId);
+  const today = trDay();
+  const yesterday = trDay(Date.now() - 86400000);
+  const available = u.last_claim !== today;
+  // Dun alinmadiysa seri sifirlanir.
+  const streak = u.last_claim === today || u.last_claim === yesterday ? u.streak : 0;
+  const next = available ? streak % DAILY_REWARDS.length : (streak - 1) % DAILY_REWARDS.length;
+  return { available, streak, day: next + 1, reward: DAILY_REWARDS[next], rewards: DAILY_REWARDS };
+}
+
+export function claimDaily(userId) {
+  const st = dailyStatus(userId);
+  if (!st.available) return null;
+  db.prepare('UPDATE users SET coins = coins + ?, streak = ?, last_claim = ? WHERE id = ? AND (last_claim IS NULL OR last_claim != ?)').run(
+    st.reward,
+    st.streak + 1,
+    trDay(),
+    userId,
+    trDay(),
+  );
+  return { reward: st.reward, user: getUser(userId) };
+}
+
+// Seviye sistemi eklenmeden onceki hediyeler de XP'ye bir kez sayilir.
+if (getSetting('xp_init') === null) {
+  db.exec(`UPDATE users SET xp = (SELECT COALESCE(SUM(coins), 0) FROM gifts WHERE from_id = users.id)
+                              + (SELECT COALESCE(SUM(coins), 0) FROM gifts WHERE to_id = users.id)`);
+  setSetting('xp_init', '1');
 }
