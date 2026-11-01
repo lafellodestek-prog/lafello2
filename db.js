@@ -403,7 +403,8 @@ export function listBanned() {
 
 // ---------- Deneme hesaplari ----------
 // Yonetici panelden acar; sifreleri panelde gorunsun diye acik olarak da saklanir.
-// Kendiliginden bir sey yapmazlar, arkalarinda hep onlari kullanan bir insan olur.
+// Demo sohbet acikken "Demo sohbet" odasinda kendi aralarinda yazisirlar; oda ve mesajlar
+// herkese "Demo" etiketiyle gorunur. Diger her seyi onlarla giren bir insan yapar.
 
 const DEMO_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
 
@@ -419,6 +420,9 @@ export function createDemoUsers(count, coins) {
   }
   return created;
 }
+
+export const demoChatEnabled = () => getSetting('demo_chat') === '1';
+export const setDemoChat = (on) => setSetting('demo_chat', on ? '1' : '0');
 
 export function listDemoUsers() {
   return db.prepare('SELECT id, name, demo_pass AS pass, coins, banned, created_at AS createdAt FROM users WHERE is_demo = 1 ORDER BY id').all().map((u) => ({ ...u, banned: !!u.banned }));

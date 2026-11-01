@@ -316,3 +316,6 @@ input:focus { border-color: var(--pink); }
 .daily-days .day span { font-weight: 800; color: var(--gold); }
 .daily-days .day.today { border-color: var(--pink); background: rgba(255,45,111,.12); }
 .daily-days .day.done { opacity: .45; }
+
+/* Demo sohbet etiketi */
+.badge.demo, .msg .tag.demo { background: #5b6478; color: #fff; }

@@ -227,7 +227,7 @@ function renderGrid() {
       const meta = r.type === 'voice' ? t('speakers', { n: r.speakers }) : r.type === 'chat' ? t('members', { n: r.count + 1 }) : t('viewers', { n: r.count });
       return `<button class="card" data-room="${r.id}" style="--h:${h}">
         <div class="card-art">${r.type === 'voice' ? '🎙️' : r.type === 'chat' ? '💬' : avatarHtml(r.hostName, 'card-avatar')}</div>
-        <div class="badges"><span class="badge live">● LIVE</span>${r.inPk ? '<span class="badge pk">PK</span>' : ''}${r.type === 'voice' ? `<span class="badge">${esc(t('tab_voice'))}</span>` : r.type === 'chat' ? `<span class="badge">${esc(t('tab_chat'))}</span>` : ''}</div>
+        <div class="badges"><span class="badge live">● LIVE</span>${r.demo ? '<span class="badge demo">Demo</span>' : ''}${r.inPk ? '<span class="badge pk">PK</span>' : ''}${r.type === 'voice' ? `<span class="badge">${esc(t('tab_voice'))}</span>` : r.type === 'chat' ? `<span class="badge">${esc(t('tab_chat'))}</span>` : ''}</div>
         <div class="card-info"><b>${esc(r.title)}</b><small>${esc(r.hostName)} · ${esc(meta)}</small></div>
       </button>`;
     })
@@ -547,7 +547,7 @@ function renderRoomActions() {
       if (!state.isHost) btns.push(`<button class="round" data-action="seat-leave" title="${t('seat_leave')}">⏏</button>`);
     }
   }
-  btns.push(`<button class="round gift" data-action="gifts" title="${t('gifts')}">🎁</button>`);
+  if (!r.demo) btns.push(`<button class="round gift" data-action="gifts" title="${t('gifts')}">🎁</button>`);
   $('#room-actions').innerHTML = btns.join('');
 }
 
@@ -566,7 +566,7 @@ function addChat(m) {
   el.className = 'msg' + (m.system ? ' system' : '') + (m.gift ? ' giftmsg' : '');
   if (m.system === 'joined') el.innerHTML = `<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(t('joined'))}`;
   else if (m.gift) el.innerHTML = `<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(t('sentGift', { gift: giftName(m.gift) }))} ${giftById(m.gift)?.emoji || ''}`;
-  else el.innerHTML = `${m.host ? `<span class="tag">${esc(t('host'))}</span>` : ''}${levelBadge(m.level)}<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(m.text)}`;
+  else el.innerHTML = `${m.demo ? '<span class="tag demo">Demo</span>' : ''}${m.host && !m.demo ? `<span class="tag">${esc(t('host'))}</span>` : ''}${levelBadge(m.level)}<b data-name="${esc(m.name)}">${esc(m.name)}</b> ${esc(m.text)}`;
   const box = $('#chat');
   box.appendChild(el);
   while (box.children.length > 60) box.firstChild.remove();

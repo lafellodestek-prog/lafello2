@@ -222,12 +222,16 @@ $('#a-tabs').onclick = (e) => {
 // ---------- Deneme hesaplari ----------
 
 async function loadDemo() {
-  let users;
+  let users, chat;
   try {
-    ({ users } = await api('/api/admin/demo'));
+    ({ users, chat } = await api('/api/admin/demo'));
   } catch {
     return;
   }
+  st.demoChat = chat;
+  $('#demo-chat-state').textContent = chat ? 'açık' : 'kapalı';
+  $('#demo-chat-state').classList.toggle('green', chat);
+  $('#demo-chat-btn').textContent = chat ? 'Kapat' : 'Aç';
   $('#demo-clear').classList.toggle('hidden', !users.length);
   $('#demo-list').innerHTML = users.length
     ? users
@@ -246,6 +250,16 @@ async function loadDemo() {
         .join('')
     : '<p class="a-empty">Henüz deneme hesabı yok. Yukarıdan açabilirsin.</p>';
 }
+
+$('#demo-chat-btn').onclick = async () => {
+  try {
+    const { on } = await api('/api/admin/demo/chat', { on: !st.demoChat });
+    toast(on ? 'Demo sohbet açıldı.' : 'Demo sohbet kapatıldı.');
+  } catch {
+    toast('Olmadı, tekrar dene.');
+  }
+  loadDemo();
+};
 
 $('#demo-form').onsubmit = async (e) => {
   e.preventDefault();

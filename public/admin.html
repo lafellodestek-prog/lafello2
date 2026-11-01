@@ -56,7 +56,12 @@
   <div id="tab-banned" class="a-list hidden"></div>
 
   <div id="tab-demo" class="hidden">
-    <p class="muted tiny demo-note">Uygulamayı denemek için hazır hesaplar. Sen ya da arkadaşların bu hesaplarla farklı telefonlardan girip yayın açabilir, hediye gönderebilir, mesajlaşabilirsiniz. Kendiliğinden bir şey yapmazlar. İstatistiklere sayılmazlar.</p>
+    <p class="muted tiny demo-note">Uygulamayı denemek için hazır hesaplar. Sen ya da arkadaşların bu hesaplarla farklı telefonlardan girip yayın açabilir, hediye gönderebilir, mesajlaşabilirsiniz. İstatistiklere ve sıralamalara sayılmazlar.</p>
+    <div class="a-item demo-chat">
+      <div class="info"><b>Demo sohbet <span class="chip" id="demo-chat-state">kapalı</span></b>
+        <div class="muted tiny">Açıkken deneme hesapları "Demo sohbet" odasında kendi aralarında yazışır. Oda ve mesajlar herkese "Demo" etiketiyle görünür. En az 3 deneme hesabı yoksa kendiliğinden açılır.</div></div>
+      <div class="actions"><button class="btn primary" id="demo-chat-btn">Aç</button></div>
+    </div>
     <form class="inline-form demo-form" id="demo-form">
       <label>Kaç hesap <input type="number" id="demo-count" min="1" max="20" value="3"></label>
       <label>Başlangıç jetonu <input type="number" id="demo-coins" min="0" max="100000" value="1000"></label>

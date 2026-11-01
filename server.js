@@ -249,6 +249,9 @@ function pkState(pk) {
   return { a: pkSide(a), b: pkSide(b), scores: pk.scores, endsIn: Math.max(0, pk.endsAt - Date.now()) };
 }
 
+// Odadaki diger kisi sayisi (ev sahibi haric). Demo odada deneme hesaplari da sayilir.
+const othersIn = (r) => Math.max(0, r.members.size - 1 + (r.demo ? r.demoCount : 0));
+
 function topList(r) {
   return [...r.top.values()].sort((x, y) => y.coins - x.coins).slice(0, 3);
 }
@@ -261,7 +264,8 @@ function roomState(r) {
     hostId: r.hostId,
     hostName: r.hostName,
     hostSocket: r.hostSocket,
-    count: Math.max(0, r.members.size - 1),
+    demo: !!r.demo,
+    count: othersIn(r),
     pk: r.pk ? pkState(r.pk) : null,
     seats: r.seats,
     top: topList(r),
@@ -274,8 +278,9 @@ function roomList() {
     type: r.type,
     title: r.title,
     hostName: r.hostName,
-    count: Math.max(0, r.members.size - 1),
+    count: othersIn(r),
     inPk: !!r.pk,
+    demo: !!r.demo,
     speakers: r.seats ? r.seats.filter(Boolean).length : 0,
   }));
 }
@@ -345,7 +350,7 @@ function leaveRoom(socket) {
       io.to(rk(r.id)).emit('seats', r.seats);
     }
   }
-  io.to(rk(r.id)).emit('room:count', Math.max(0, r.members.size - 1));
+  io.to(rk(r.id)).emit('room:count', othersIn(r));
   broadcastRooms();
 }
 
@@ -408,7 +413,8 @@ io.on('connection', (socket) => {
       leaveRoom(socket);
       joinRoom(socket, r);
       systemChat(r, 'joined', me.name);
-      io.to(rk(r.id)).emit('room:count', Math.max(0, r.members.size - 1));
+      demoGreet(r, me.name);
+      io.to(rk(r.id)).emit('room:count', othersIn(r));
       broadcastRooms();
     }
     cb({ room: roomState(r) });
@@ -430,6 +436,7 @@ io.on('connection', (socket) => {
     const r = myRoom();
     const gift = GIFTS.find((g) => g.id === giftId);
     if (!r || !gift) return cb({ error: 'bad' });
+    if (r.demo) return cb({ error: 'demo' });
     let target = r;
     if (r.pk && targetRoomId && [r.pk.a, r.pk.b].includes(String(targetRoomId))) target = rooms.get(String(targetRoomId)) || r;
     let to = { id: target.hostId, name: target.hostName };
@@ -625,7 +632,7 @@ app.get('/api/admin/overview', adminAuth, (req, res) => {
     title: r.title,
     hostId: r.hostId,
     hostName: r.hostName,
-    viewers: Math.max(0, r.members.size - 1),
+    viewers: othersIn(r),
     inPk: !!r.pk,
     startedAt: r.startedAt,
     giftCoins: [...r.top.values()].reduce((s, x) => s + x.coins, 0),
@@ -686,7 +693,7 @@ app.post('/api/admin/users/:id/coins', adminAuth, (req, res) => {
 // ---------- Deneme hesaplari ----------
 
 app.get('/api/admin/demo', adminAuth, (req, res) => {
-  res.json({ users: db.listDemoUsers().map((u) => ({ ...u, online: userSockets.has(u.id) })) });
+  res.json({ users: db.listDemoUsers().map((u) => ({ ...u, online: userSockets.has(u.id) })), chat: db.demoChatEnabled() });
 });
 
 app.post('/api/admin/demo', adminAuth, (req, res) => {
@@ -722,6 +729,117 @@ app.post('/api/admin/demo/delete-all', adminAuth, (req, res) => {
   for (const u of users) removeDemo(u.id);
   res.json({ deleted: users.length });
 });
+
+// ---------- Demo sohbet ----------
+// Yonetici acinca deneme hesaplari "Demo sohbet" odasinda hazir kisa konusmalarla yazisir.
+// Oda ve mesajlar herkese "Demo" etiketiyle gorunur, bu odada hediye gonderilemez.
+
+const DEMO_TALKS = [
+  [[0, 'Selam herkese 👋'], [1, 'Selam! Nasılsın?'], [0, 'İyiyim, sen nasılsın?'], [1, 'Ben de iyiyim, çay demledim ☕']],
+  [[0, 'Bu akşam ne izliyorsunuz?'], [1, 'Bir dizi başladım, çok sardı'], [2, 'Ben maç izleyeceğim ⚽'], [0, 'Kim oynuyor?'], [2, 'Derbi var, kaçmaz!']],
+  [[1, 'Hava bugün çok güzeldi'], [0, 'Evet, sonunda güneş çıktı ☀️'], [1, 'Yürüyüşe çıktım, iyi geldi']],
+  [[2, 'Yemekte ne var?'], [0, 'Mercimek çorbası 🍲'], [1, 'Bizde makarna var'], [2, 'İkisi de güzelmiş, acıktım 😄']],
+  [[0, 'Sesli odaları denediniz mi?'], [1, 'Evet, koltuğa oturup konuşabiliyorsun'], [0, 'Süper, akşam bir oda açarım 🎙️']],
+  [[1, 'Bir şarkı önerin bana 🎵'], [2, 'Eski bir Barış Manço şarkısı aç'], [1, 'Güzel fikir, hemen açıyorum'], [0, 'Ben de dinliyorum şimdi']],
+  [[0, 'Günlük ödülü aldınız mı bugün?'], [1, 'Aldım, serim 3 gün oldu 🎁'], [2, 'Ben unutmuşum, hemen alıyorum']],
+  [[2, 'Hafta sonu planınız var mı?'], [0, 'Pikniğe gideceğiz'], [1, 'Ben evde dinleneceğim'], [2, 'İkisi de güzel plan 😊']],
+  [[1, 'Kitap okuyan var mı burada? 📚'], [0, 'Ben bir roman okuyorum'], [1, 'Bitince anlatırsın'], [0, 'Tabii, söz']],
+  [[0, 'PK yarışmalarını izlediniz mi?'], [2, 'Dün bir tane izledim, çok heyecanlıydı'], [0, 'Son saniyede kazandı galiba'], [2, 'Aynen 😄']],
+  [[1, 'Günaydın millet ☀️'], [0, 'Günaydın!'], [2, 'Kahvemi aldım, güne hazırım ☕']],
+  [[2, 'Hangi şehirdensiniz?'], [0, 'Ben İzmir'], [1, 'Ben de Ankara'], [2, 'Ben İstanbul, selamlar 👋']],
+  [[0, 'Sizce en güzel hediye hangisi?'], [1, 'Bence roket 🚀'], [2, 'Şato daha havalı 🏰'], [0, 'Gül de tatlı ama 🌹']],
+  [[1, 'Ben biraz çıkıyorum, sonra görüşürüz'], [0, 'Görüşürüz, kendine iyi bak'], [2, 'Bay bay 👋']],
+  [[0, 'Bugün çok yorulduk ya'], [2, 'Haklısın, uzun bir gündü'], [1, 'Bir film izleyip dinlenin bence 🎬']],
+];
+
+const DEMO_GREETS = ['Hoş geldin {name} 👋', 'Selam {name}!', '{name} hoş geldin, nasılsın?'];
+
+const demo = { room: null, timer: null, queue: [] };
+const rand = (n) => Math.floor(Math.random() * n);
+const demoUsers = () => db.listDemoUsers().filter((u) => !u.banned);
+
+function demoSay(r, user, text) {
+  io.to(rk(r.id)).emit('chat', { name: user.name, text, host: r.hostId === user.id, level: db.getUser(user.id)?.level, demo: true });
+}
+
+function openDemoRoom(host, count) {
+  const r = {
+    id: String(nextRoomId++),
+    type: 'chat',
+    demo: true,
+    demoCount: count,
+    title: 'Demo sohbet ☕',
+    hostId: host.id,
+    hostName: host.name,
+    hostSocket: null,
+    startedAt: Date.now(),
+    members: new Set(),
+    banned: new Set(),
+    top: new Map(),
+    pk: null,
+    seats: null,
+  };
+  rooms.set(r.id, r);
+  broadcastRooms();
+  return r;
+}
+
+function stopDemoChat() {
+  clearTimeout(demo.timer);
+  demo.timer = null;
+  demo.queue = [];
+  if (demo.room && rooms.get(demo.room.id) === demo.room) endRoom(demo.room);
+  demo.room = null;
+}
+
+function demoTick() {
+  demo.timer = null;
+  const users = demoUsers();
+  if (!db.demoChatEnabled() || users.length < 2) return stopDemoChat();
+  let r = demo.room && rooms.get(demo.room.id) === demo.room ? demo.room : null;
+  if (r && !users.some((u) => u.id === r.hostId)) {
+    stopDemoChat();
+    r = null;
+  }
+  if (!r) r = demo.room = openDemoRoom(users[0], users.length);
+  if (r.demoCount !== users.length) {
+    r.demoCount = users.length;
+    broadcastRooms();
+  }
+  let pause = 0;
+  if (!demo.queue.length) {
+    // Yeni konusma: roller karisik siradaki deneme hesaplarina dagitilir.
+    const cast = [...users].sort(() => Math.random() - 0.5);
+    demo.queue = DEMO_TALKS[rand(DEMO_TALKS.length)].map(([role, text]) => ({ user: cast[role % cast.length], text }));
+  }
+  const line = demo.queue.shift();
+  demoSay(r, line.user, line.text);
+  if (!demo.queue.length) pause = 20000 + rand(25000);
+  demo.timer = setTimeout(demoTick, pause || 3000 + rand(5000));
+}
+
+function startDemoChat() {
+  if (!demo.timer) demo.timer = setTimeout(demoTick, 1000);
+}
+
+function demoGreet(r, name) {
+  if (!r.demo || demo.room !== r) return;
+  const users = demoUsers().filter((u) => u.name !== name);
+  if (!users.length) return;
+  const text = DEMO_GREETS[rand(DEMO_GREETS.length)].replace('{name}', name);
+  setTimeout(() => rooms.get(r.id) === r && demoSay(r, users[rand(users.length)], text), 1500 + rand(2000));
+}
+
+app.post('/api/admin/demo/chat', adminAuth, (req, res) => {
+  const on = req.body?.on === true;
+  if (on && demoUsers().length < 3) db.createDemoUsers(3 - demoUsers().length, 1000);
+  db.setDemoChat(on);
+  if (on) startDemoChat();
+  else stopDemoChat();
+  res.json({ on });
+});
+
+if (db.demoChatEnabled()) setTimeout(startDemoChat, 3000);
 
 server.on('error', (err) => {
   if (err.code !== 'EADDRINUSE') throw err;

@@ -53,3 +53,6 @@
 .demo-form .btn { align-self: flex-end; }
 .demo-pass { font-family: ui-monospace, Consolas, monospace; letter-spacing: .5px; }
 .demo-clear { margin-top: 12px; }
+
+.demo-chat { margin-bottom: 12px; }
+.chip.green { background: rgba(22,163,107,.2); color: #2fd08f; }
