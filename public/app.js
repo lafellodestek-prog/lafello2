@@ -147,12 +147,120 @@ $('#auth-form').onsubmit = async (e) => {
   if (reg && !body.adult) return ($('#auth-error').textContent = t('err_adult'));
   try {
     const { token, user } = await api(reg ? '/api/register' : '/api/login', body);
-    state.token = token;
-    store.set('sahne_token', token);
-    enterApp(user);
+    loggedIn(token, user);
   } catch (err) {
     $('#auth-error').textContent = t(`err_${err.code}`);
   }
+};
+
+function loggedIn(token, user) {
+  state.token = token;
+  store.set('sahne_token', token);
+  enterApp(user);
+  // Giristen once tiklanan oyun varsa hemen acilir.
+  const p = state.pending;
+  state.pending = null;
+  if (p?.game) openGame(p.game, p.title);
+}
+
+// ---------- Misafir ----------
+// Giris yapmadan acilinca oyun listesi gorunur; baska her sey giris ister.
+
+function enterGuest() {
+  state.user = null;
+  document.body.classList.add('guest');
+  state.tab = 'games';
+  $$('#home-tabs button').forEach((x) => x.classList.toggle('active', x.dataset.tab === 'games'));
+  show('home');
+  renderGrid();
+}
+
+function openLogin(why) {
+  $('#auth-why').classList.toggle('hidden', !why);
+  $('.auth-close').classList.toggle('hidden', !document.body.classList.contains('guest'));
+  $('#auth-error').textContent = $('#google-error').textContent = '';
+  show('auth');
+}
+
+const GUEST_OK = '[data-tab="games"], [data-cat], [data-action="lang"], [data-action="login"]';
+document.addEventListener(
+  'click',
+  (e) => {
+    if (!document.body.classList.contains('guest') || !e.target.closest('#view-home')) return;
+    if (e.target.closest(GUEST_OK)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const g = e.target.closest('[data-game]');
+    state.pending = g ? { game: g.dataset.game, title: g.dataset.title } : null;
+    openLogin(true);
+  },
+  true,
+);
+
+// ---------- Google ile giris ----------
+// Tarayicida Google'in kendi dugmesi; Android uygulamasinda telefonun Google hesabi kullanilir.
+
+const googleNative = () => typeof window.LafelloApp?.googleSignIn === 'function';
+state.googleCred = null;
+
+async function googleLogin(credential) {
+  state.googleCred = credential;
+  $('#google-error').textContent = '';
+  const adult = $('#google-adult').checked;
+  try {
+    const { token, user } = await api('/api/google', { credential, adult });
+    state.googleCred = null;
+    loggedIn(token, user);
+  } catch (err) {
+    if (err.code === 'adult') {
+      // Ilk giris: 18 yas onayi isaretlenince ayni Google girisiyle devam edilir.
+      $('#google-adult-row').classList.remove('hidden');
+      $('#google-error').textContent = t('google_adult');
+      return;
+    }
+    $('#google-error').textContent = t(err.code === 'banned' ? 'err_banned' : 'err_google');
+  }
+}
+
+$('#google-adult').onchange = () => {
+  if ($('#google-adult').checked && state.googleCred) googleLogin(state.googleCred);
+};
+
+// Android uygulamasi Google girisini bitirince bu cagrilir.
+window.lafelloGoogle = (credential) => {
+  if (credential) googleLogin(credential);
+  else $('#google-error').textContent = t('err_google');
+};
+
+function setupGoogle() {
+  const id = state.config?.googleClientId;
+  const inApp = !!window.LafelloApp;
+  // Google, uygulama icindeki web gorunumunde kendi dugmesine izin vermez.
+  const usable = id && (inApp ? googleNative() : true);
+  $('#google-box').classList.toggle('hidden', !usable);
+  $('#auth-form').classList.toggle('hidden', !!usable);
+  $('#auth-switch').classList.toggle('hidden', !!usable);
+  if (!usable) return;
+  if (inApp) {
+    $('#google-btn').innerHTML = `<button class="btn google-native" type="button"><span class="g">G</span>${esc(t('google_continue'))}</button>`;
+    $('#google-btn button').onclick = () => window.LafelloApp.googleSignIn();
+    return;
+  }
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.async = true;
+  s.onload = () => {
+    google.accounts.id.initialize({ client_id: id, callback: (r) => googleLogin(r.credential), ux_mode: 'popup' });
+    google.accounts.id.renderButton($('#google-btn'), {
+      theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', width: 300, locale: state.lang,
+    });
+  };
+  document.head.appendChild(s);
+}
+
+$('#pass-toggle').onclick = () => {
+  $('#auth-form').classList.toggle('hidden');
+  $('#auth-switch').classList.toggle('hidden');
 };
 
 async function logout() {
@@ -165,13 +273,14 @@ async function logout() {
   state.user = null;
   store.del('sahne_token');
   closeSheets();
-  show('auth');
+  enterGuest();
 }
 
 // ---------- Ana sayfa ----------
 
 function enterApp(user) {
   state.user = user;
+  document.body.classList.remove('guest');
   renderWallet();
   connectSocket();
   show('home');
@@ -308,11 +417,12 @@ function connectSocket() {
   });
   socket.on('banned', async () => {
     await logout();
-    $('#auth-error').textContent = t('err_banned');
+    openLogin();
+    $('#auth-error').textContent = $('#google-error').textContent = t('err_banned');
   });
   socket.on('account:deleted', async () => {
     await logout();
-    $('#auth-error').textContent = t('err_deleted');
+    toast(t('err_deleted'));
   });
   socket.on('kicked', () => {
     toast(t('kicked'));
@@ -1168,6 +1278,13 @@ document.addEventListener('click', async (e) => {
   const a = e.target.closest('[data-action]')?.dataset.action;
   if (!a) return;
   switch (a) {
+    case 'login':
+      state.pending = null;
+      openLogin(false);
+      break;
+    case 'auth-close':
+      enterGuest();
+      break;
     case 'lang':
       state.lang = state.lang === 'tr' ? 'en' : 'tr';
       store.set('sahne_lang', state.lang);
@@ -1208,6 +1325,10 @@ document.addEventListener('click', async (e) => {
       break;
     case 'delete-account':
       $('#delete-pass').value = '';
+      $('#delete-confirm').checked = false;
+      $('#delete-pass').classList.toggle('hidden', !!state.user.google);
+      $('#delete-confirm-row').classList.toggle('hidden', !state.user.google);
+      $('#delete-q').textContent = t(state.user.google ? 'delete_q_google' : 'delete_q');
       $('#delete-error').textContent = '';
       openSheet('delete');
       break;
@@ -1265,16 +1386,17 @@ $$('#sheet-golive .choice').forEach((b) => {
 $('#golive-start').onclick = goLive;
 
 $('#delete-yes').onclick = async () => {
+  const google = state.user?.google;
   const pass = $('#delete-pass').value;
-  if (!pass) return;
+  if (google ? !$('#delete-confirm').checked : !pass) return;
   try {
-    await api('/api/account/delete', { pass });
+    await api('/api/account/delete', google ? { confirm: true } : { pass });
   } catch (err) {
     $('#delete-error').textContent = t(err.code === 'pass' ? 'err_pass_wrong' : 'err_net');
     return;
   }
   await logout();
-  $('#auth-error').textContent = t('err_deleted');
+  toast(t('err_deleted'));
 };
 
 // ---------- Oyunlar ----------
@@ -1744,6 +1866,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
     $('#auth-error').textContent = t('err_net');
   }
   applyLang();
+  setupGoogle();
   if (state.token) {
     try {
       const { user } = await api('/api/me');
@@ -1753,5 +1876,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
       state.token = null;
     }
   }
-  show('auth');
+  enterGuest();
+  // Bildirimden gelen adresle misafir acilirsa once giris istenir.
+  if (location.search) openLogin(true);
 })();

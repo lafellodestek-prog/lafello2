@@ -27,3 +27,6 @@ export const SIGNUP_BONUS = 50;
 // Odullu reklam: izleyen kullanici jeton kazanir (gunde en fazla AD_DAILY kez).
 export const AD_REWARD = 10;
 export const AD_DAILY = 5;
+
+// Google ile giris icin web istemci kimligi (gizli degildir, sayfada zaten gorunur).
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';

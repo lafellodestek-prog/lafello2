@@ -18,8 +18,16 @@
 <!-- Giris / kayit -->
 <section id="view-auth" class="view">
   <div class="auth-card">
+    <button class="icon-btn auth-close hidden" type="button" data-action="auth-close">✕</button>
     <div class="logo big"><span class="dot"></span>Lafello</div>
     <p class="muted" data-i18n="tagline"></p>
+    <p class="auth-why hidden" id="auth-why" data-i18n="login_needed"></p>
+    <div class="google-box hidden" id="google-box">
+      <div id="google-btn"></div>
+      <label class="check hidden" id="google-adult-row"><input type="checkbox" id="google-adult"> <span data-i18n="adult"></span></label>
+      <p class="error" id="google-error"></p>
+      <button class="link" id="pass-toggle" type="button" data-i18n="login_with_name"></button>
+    </div>
     <form id="auth-form" autocomplete="on">
       <input id="auth-name" name="username" autocomplete="username" data-i18n-ph="name" required>
       <input id="auth-pass" name="password" type="password" autocomplete="current-password" data-i18n-ph="pass" required>
@@ -39,11 +47,12 @@
   <header class="topbar">
     <div class="logo"><span class="dot"></span>Lafello</div>
     <div class="topbar-right">
+      <button class="btn primary guest-only login-btn" data-action="login" data-i18n="login"></button>
       <button class="icon-btn dm-btn" data-action="leaderboard" title="Sıralama">🏆</button>
       <button class="icon-btn dm-btn" data-action="inbox" title="Mesajlar">💬<i class="dm-badge hidden"></i></button>
-      <button class="pill coin" data-action="wallet"><span>🪙</span><b id="home-coins">0</b></button>
+      <button class="pill coin member-only" data-action="wallet"><span>🪙</span><b id="home-coins">0</b></button>
       <button class="lang-btn" type="button" data-action="lang"></button>
-      <button class="avatar-btn" data-action="my-profile" id="home-avatar"></button>
+      <button class="avatar-btn member-only" data-action="my-profile" id="home-avatar"></button>
     </div>
   </header>
   <nav class="tabs" id="home-tabs">
@@ -166,7 +175,8 @@
 
 <div class="sheet hidden" id="sheet-delete">
   <h3 data-i18n="delete_account"></h3>
-  <p class="muted" data-i18n="delete_q"></p>
+  <p class="muted" id="delete-q" data-i18n="delete_q"></p>
+  <label class="check hidden" id="delete-confirm-row"><input type="checkbox" id="delete-confirm"> <span data-i18n="delete_google"></span></label>
   <input id="delete-pass" type="password" autocomplete="current-password" data-i18n-ph="pass">
   <p class="error" id="delete-error"></p>
   <div class="row">

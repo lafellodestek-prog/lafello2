@@ -111,6 +111,8 @@ addColumn('users', 'avatar_img', 'BLOB');
 addColumn('users', 'xp', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('users', 'streak', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('users', 'last_claim', 'TEXT');
+addColumn('users', 'google_sub', 'TEXT');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_google ON users(google_sub) WHERE google_sub IS NOT NULL');
 
 // Bot ozelligi kaldirildi; onceki surumden kalan bot hesaplari silinir.
 db.exec('DELETE FROM users WHERE is_bot = 1');
@@ -149,6 +151,7 @@ export function publicUser(u) {
     level,
     levelFrom: xpForLevel(level),
     levelTo: xpForLevel(level + 1),
+    google: !!u.google_sub,
   };
 }
 
@@ -162,6 +165,24 @@ export function createUser(name, pass) {
   const salt = randomBytes(16).toString('hex');
   const { lastInsertRowid } = q.insertUser.run(name, hash(pass, salt), salt, SIGNUP_BONUS, Date.now());
   return getUser(Number(lastInsertRowid));
+}
+
+// Google ile giris: ayni Google hesabi hep ayni kullaniciya baglanir. Yeni kullaniciya
+// Google adindan uretilen, bos bir kullanici adi verilir; sifresi rastgeledir.
+export function googleUser(sub) {
+  const u = db.prepare('SELECT * FROM users WHERE google_sub = ?').get(sub);
+  if (!u) return null;
+  return u.banned ? { banned: true } : publicUser(u);
+}
+
+export function createGoogleUser(sub, displayName) {
+  let base = String(displayName || '').normalize('NFC').replace(/[^\p{L}\p{N}_.]/gu, '').slice(0, 14);
+  if (base.length < 3) base = 'oyuncu';
+  let name = base;
+  for (let i = 0; q.userByName.get(name); i++) name = `${base}${Math.floor(1000 + Math.random() * 9000)}${i > 20 ? i : ''}`;
+  const user = createUser(name, randomBytes(24).toString('hex'));
+  db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(sub, user.id);
+  return getUser(user.id);
 }
 
 export function checkLogin(name, pass) {

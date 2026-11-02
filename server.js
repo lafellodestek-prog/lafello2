@@ -10,7 +10,7 @@ import * as db from './db.js';
 import * as push from './push.js';
 import { gameList, gameCategories } from './games.js';
 import { attachArena, arenaSocket, arenaDisconnect } from './arena.js';
-import { GIFTS, PACKS, HOST_SHARE, PK_SECONDS, VOICE_SEATS, AD_REWARD, AD_DAILY } from './config.js';
+import { GIFTS, PACKS, HOST_SHARE, PK_SECONDS, VOICE_SEATS, AD_REWARD, AD_DAILY, GOOGLE_CLIENT_ID } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -32,7 +32,7 @@ function auth(req, res, next) {
 }
 
 app.get('/api/config', (req, res) => {
-  res.json({ gifts: GIFTS, packs: PACKS, hostShare: HOST_SHARE, pkSeconds: PK_SECONDS, voiceSeats: VOICE_SEATS });
+  res.json({ gifts: GIFTS, packs: PACKS, hostShare: HOST_SHARE, pkSeconds: PK_SECONDS, voiceSeats: VOICE_SEATS, googleClientId: GOOGLE_CLIENT_ID });
 });
 
 app.post('/api/register', (req, res) => {
@@ -56,6 +56,30 @@ app.post('/api/login', (req, res) => {
   res.json({ token: db.createSession(user.id), user });
 });
 
+// Google girisi: tarayicidan (ya da Android uygulamasindan) gelen kimlik kartini Google'a
+// dogrulatir. Ilk giriste 18 yas onayi istenir.
+async function verifyGoogle(credential) {
+  if (!GOOGLE_CLIENT_ID || typeof credential !== 'string' || credential.length > 4096) return null;
+  const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`).catch(() => null);
+  if (!r?.ok) return null;
+  const info = await r.json().catch(() => null);
+  const okIss = info?.iss === 'accounts.google.com' || info?.iss === 'https://accounts.google.com';
+  if (!okIss || info.aud !== GOOGLE_CLIENT_ID || !info.sub || Number(info.exp) * 1000 < Date.now()) return null;
+  return info;
+}
+
+app.post('/api/google', async (req, res) => {
+  const info = await verifyGoogle(req.body?.credential);
+  if (!info) return res.status(400).json({ error: 'google' });
+  let user = db.googleUser(info.sub);
+  if (user?.banned) return res.status(403).json({ error: 'banned' });
+  if (!user) {
+    if (req.body?.adult !== true) return res.status(400).json({ error: 'adult' });
+    user = db.createGoogleUser(info.sub, info.given_name || info.name || String(info.email || '').split('@')[0]);
+  }
+  res.json({ token: db.createSession(user.id), user });
+});
+
 app.post('/api/logout', auth, (req, res) => {
   db.deleteSession(req.token);
   res.json({ ok: true });
@@ -65,7 +89,8 @@ app.get('/api/me', auth, (req, res) => res.json({ user: req.user }));
 
 // Kullanici kendi hesabini siler (Google Play zorunlulugu). Sifre tekrar sorulur.
 app.post('/api/account/delete', auth, (req, res) => {
-  const check = db.checkLogin(req.user.name, req.body?.pass);
+  // Google ile giren kullanicinin sifresi yoktur; onun yerine acik onay istenir.
+  const check = req.user.google ? req.body?.confirm === true : db.checkLogin(req.user.name, req.body?.pass);
   if (!check || check.banned) return res.status(400).json({ error: 'pass' });
   closeConnections(req.user.id);
   db.deleteUserData(req.user.id);
